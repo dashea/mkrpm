@@ -1,1 +1,1 @@
-EXTRA_DIST = rpmdump.c
+EXTRA_DIST = rpmdump.c hexconvert.sh
