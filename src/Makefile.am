@@ -1,3 +1,4 @@
 bin_PROGRAMS = mkrpm
 
-mkrpm_SOURCES = mkrpm.c
+mkrpm_SOURCES = mkrpm.c \
+		rpmtypes.h
