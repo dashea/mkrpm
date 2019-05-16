@@ -379,6 +379,7 @@ int dumpRpm(const char *filename, FILE *input) {
         return EXIT_FAILURE;
     }
 
+    printf("Payload start: %ld\n", startpos);
     printf("Payload length: %ld\n", endpos - startpos);
 
     return EXIT_SUCCESS;
