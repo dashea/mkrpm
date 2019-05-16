@@ -1,0 +1,577 @@
+This is an attempt to decipher all of the tags that may appear in an RPM.
+
+THE TYPES
+=========
+
+Every tag number has an associated type. The type is included in the "type" field
+of the tag index record.
+
+* RPM_NULL_TYPE (0)
+
+    Not actually used. Some tags have this type set in tagtbl.C, but that's because
+    no one gave them a correct type annotation in rpmtag.h, and gentagtbl.sh falls
+    back to this type. The tags that claim to use RPM_NULL_TYPE actually use RPM_BIN_TYPE.
+
+* RPM_CHAR_TYPE (1)
+* RPM_INT8_TYPE (2)
+* RPM_INT16_TYPE (3)
+* RPM_INT32_TYPE (4)
+* RPM_INT64_TYPE (5)
+
+    Integers of various sizes, in network byte order. The "count" field of the tag index record
+    indicates how many array members are contained in the tag.
+
+    RPM_CHAR_TYPE is effectively the same as RPM_INT8_TYPE, and is used by exactly one tag, RPMTAG_FILESTATES.
+
+* RPM_STRING_TYPE (6)
+
+    A single string. "count" is always 1. The value is from "offset" until the first \0.
+    Effectively the same as RPM_STRING_ARRAY_TYPE.
+
+* RPM_BIN_TYPE (7)
+
+    Effectively the same as RPM_INT8_TYPE. Describes a binary blob, the length of which
+    is in "count".
+
+* RPM_STRING_ARRAY_TYPE (8)
+
+    Several strings. The number of strings is in "count", and each string is 0-terminated.
+
+* RPM_I18N_STRING_TYPE (9)
+
+    Also an array of strings, but each entry is a translation. The indexes correspond to values
+    in RPMTAG_HEADERI18NTABLE, which is a string array listing the locales available for I18N strings.
+    The "C" locale is usually index 0.
+
+THE TAGS
+========
+
+There are two types of tags, for the two types of RPM header: signature tags
+and header tags. There have been some attempts in the past to unify the header
+tags (rpmTag) and signature (rpmSigTag), none of them complete. Some signature
+tags are redefined in rpmTag but never appear outside of the signature header,
+some signature tag values conflict with header tag values, and one tag value
+that does appear in the signature tag section (RPMTAG_HEADERSIGNATURES) is only
+defined in rpmTag.
+
+For the definitions here, with the exception of RPMTAG_HEADERSIGNATURES, everything
+that starts with "RPMSIGTAG\_" appears in the signature header, and everything that
+starts with "RPMTAG\_" appears in the other header.
+
+Whether a tag is "Required" vs. "Optional" is defined by LSB-5.0.0.
+
+Some tags are "region tags", which might have meant something in the past, but now
+are basically just optional type information at the start of a header. The data in
+a region tag is always as the end of header's data blob, and is always 16 bytes,
+consisting of four 32-bit 2's complement integers in network byte order:
+
+* The tag number
+* The tag type (always 7, RPM_BIN_TYPE)
+* The total number of tags in the header (including the region tag), times 16, negated (e.g., -176 for 11 tags)
+* The number 16
+
+REQUIRED
+--------
+
+* RPMSIGTAG_SIZE = 1000 (INT32)
+
+    This is the size of the header (the second one, not the signature one) plus the size of the payload.
+
+* RPMSIGTAG_MD5 = 1004 (BIN)
+
+    The MD5 checksum of the immutable header and payload.
+
+* RPMTAG_NAME = 1000 (STRING)
+* RPMTAG_VERSION = 1001 (STRING)
+* RPMTAG_RELEASE = 1002 (STRING)
+* RPMTAG_SUMMARY = 1004 (I18N STRING)
+* RPMTAG_DESCRIPTION = 1005 (I18N STRING)
+
+* RPMTAG_SIZE = 1009 (INT32)
+
+    This is the sum of the sizes of every regular file in the package.
+
+* RPMTAG_LICENSE = 1014 (STRING)
+* RPMTAG_GROUP = 1016 (STRING)
+
+    Group is "required" in the package, but it is not required to build a package. Fedora
+    specifies that the Group tag SHOULD NOT be used in spec files. When not present in a
+    spec file, rpmbuild uses "Unspecified" for the group value.
+
+* RPMTAG_OS = 1021 (STRING)
+
+    "linux"
+
+* RPMTAG_ARCH = 1022 (STRING)
+
+    The "arch" part of the NEVRA.
+
+* RPMTAG_FILESIZES = 1028 (INT32)
+
+    An array containing the size of each file in the package.
+
+* RPMTAG_FILEMODES = 1030 (INT16)
+
+    The st_mode value for each file.
+
+* RPMTAG_FILERDEVS = 1033 (INT16)
+
+    st_rdev for each file.
+
+* RPMTAG_FILEMTIMES = 1034 (INT32)
+
+    The modtime for each file.
+
+* RPMTAG_FILEMD5S  = 1035 (STRING ARRAY)
+* RPMTAG_FILEDIGESTS  = 1035 (STRING ARRAY)
+
+    RPMTAG_FILEDIGESTS is now the preferred name for this tag, since the values are not
+    necessarily MD5 checksums.
+
+    The checksum for each file, or an empty string if it's not something that has content
+    (like a directory). The algorithm used is stored in RPMTAG_FILEDIGESTALGO.
+
+* RPMTAG_FILELINKTOS = 1036 (STRING ARRAY)
+
+    The symlink target for each file, or an empty string if the file is not a symlink.
+
+* RPMTAG_FILEFLAGS = 1037 (INT32)
+
+    A bitfield describing each file, using the following values:
+
+    * RPMFILE_CONFIG = (1 << 0)
+    * RPMFILE_DOC = (1 << 1)
+    * RPMFILE_DONOTUSE = (1 << 2)
+
+        This used to be RPMFILE_SPECFILE, but it dropped after a bug marked every
+        file with this flag.
+
+    * RPMFILE_MISSINGOK = (1 << 3)
+    * RPMFILE_NOREPLACE = (1 << 4)
+    * RPMFILE_SPECFILE = (1 << 5)
+    * RPMFILE_GHOST = (1 << 6)
+    * RPMFILE_LICENSE = (1 <<  7)
+    * RPMFILE_README = (1 << 8)
+    * RPMFILE_EXCLUDE = (1 << 9)
+
+* RPMTAG_FILEUSERNAME = 1039 (STRING ARRAY)
+
+    The owner of each file, as a string
+
+* RPMTAG_FILEGROUPNAME = 1040 (STRING ARRAY)
+
+    The group owner for each file, as a string
+
+* RPMTAG_PROVIDENAME = 1047 (STRING ARRAY)
+* RPMTAG_REQUIREFLAGS = 1048 (INT32)
+* RPMTAG_REQUIRENAME = 1049 (STRING ARRAY)
+* RPMTAG_REQUIREVERSION = 1050 (STRING ARRAY)
+* RPMTAG_PROVIDEFLAGS = 1112 (INT32)
+* RPMTAG_PROVIDEVERSION = 1113 (STRING ARRAY)
+
+    The Provides and Requires data for the package. The flags are bitfields using the following values:
+
+    * RPMSENSE_LESS = (1 << 1)
+    * RPMSENSE_GREATER = (1 << 2)
+    * RPMSENSE_EQUAL = (1 << 3)
+
+        Yes, it's possible for a requirement to combine RPMSENSE_LESS and RPMSENSE_GREATER. Don't do that.
+
+    * RPMSENSE_POSTTRANS = (1 << 5)
+
+        %posttrans dependency, not in LSB
+
+    * RPMSENSE_PREREQ = (1 << 6)
+
+        This value is deprecated. Effectively it means RPMSENSE_SCRIPT_PRE | RPMSENSE_SCRIPT_PREUN
+
+    * RPMSENSE_PRETRANS = (1 << 7)
+
+        %pretrans dependency, not in LSB
+
+    * RPMSENSE_INTERP = (1 << 8)
+
+        This requirement is a scriptlet interpreter
+
+    * RPMSENSE_SCRIPT_PRE = (1 << 9)
+    * RPMSENSE_SCRIPT_POST = (1 << 10)
+    * RPMSENSE_SCRIPT_PREUN = (1 << 11)
+    * RPMSENSE_SCRIPT_POSTUN = (1 << 12)
+
+        %pre, %post, %preun, %postun dependencies, respectively
+
+    * RPMSENSE_SCRIPT_VERIFY = (1 << 13)
+
+        %verify dependency. Not in LSB, also no one uses %verify.
+
+    * RPMSENSE_FIND_REQUIRES = (1 << 14)
+
+        This dependency was generated automatically by the find-requires process. Not in LSB
+
+    * RPMSENSE_FIND_PROVIDES = (1 << 15)
+
+        This provides was generated automatically by the find-provides process. Not in LSB
+
+    * RPMSENSE_TRIGGERIN = (1 << 16)
+    * RPMSENSE_TRIGGERUN = (1 << 17)
+    * RPMSENSE_TRIGGERPOSTUN = (1 << 18)
+
+        %triggerin, %triggerun, %triggerpostun dependencies. Not in LSB
+
+    * RPMSENSE_MISSINGOK = (1 << 19)
+
+        Missing dependencies are fine. This is used with weak dependencies. Not in LSB.
+
+    * RPMSENSE_RPMLIB = (1 << 24)
+
+        rpmlib(feature) dependency.
+
+    * RPMSENSE_TRIGGERPREIN = (1 << 25)
+
+        %triggerprein dependency. Not in LSB
+
+    * RPMSENSE_KEYRING = (1 << 26)
+
+        Used with key files stored in the rpmdb, shouldn't appear in an actual package file. Not in LSB
+
+    * RPMSENSE_CONFIG = (1 << 28)
+
+        Used for the generated config(foo) provides. Not in LSB.
+
+* RPMTAG_FILEDEVICES = 1095 (INT32)
+
+    st_dev for each file. rpmbuild outputs "1" for every file, unless the original
+    file's st_dev is 0, which I don't think is a thing that actually happens.
+
+* RPMTAG_FILEINODES = 1096 (INT32)
+
+    st_ino. This is necessary to determine whether a file is a hard link. Since RPM
+    flattens st_dev all to a single filesystem (1), the inode numbers are also remapped
+    to dummy values.
+
+* RPMTAG_FILELANGS = 1097 (STRING ARRAY)
+
+    For locale-specific files (like .mo files), the language that this file corresponds to.
+    For files that are not locale-specific, an empty string.
+
+* RPMTAG_DIRINDEXES = 1116 (INT32)
+* RPMTAG_BASENAMES = 1117 (STRING ARRAY)
+* RPMTAG_DIRNAMES = 1118 (STRING ARRAY)
+
+    These three tags are the new way to encode file paths, and the use of it requires
+    "rpmlib(CompressedFileNames) <= 3.0.4-1" in the package requirements.
+
+    Each file has an entry in BASENAMES and DIRINDEXES. The value in DIRINDEXES is an index into
+    the DIRNAMES array, so the full path for file `i` is then `DIRNAMES[DIRINDEXES[i]] + "/" + BASENAMES[i]`.
+
+* RPMTAG_PAYLOADFORMAT = 1124 (STRING)
+
+    The format of the payload, before compression. Always "cpio", though RPM was talking
+    about adding tar payload support at some point.
+
+* RPMTAG_PAYLOADCOMPRESSOR = 1125 (STRING)
+
+    The compression used on the payload. LSB specifies that this should be "gzip", but rpm
+    allows a lot of different values. Packages built for Fedora and RHEL-8 use
+    "xz", with a requirement on "rpmlib(PayloadIsXz) <= 5.2-1".
+
+* RPMTAG_PAYLOADFLAGS = 1126 (STRING)
+
+    The compression level used with the payload. LSB specifies that this should be "9".
+    Fedora and RHEL-8 use "2".
+
+OPTIONAL
+--------
+
+* RPMTAG_HEADERSIGNATURES = 62 (BIN)
+
+    A region tag marking the header as a signature header.
+
+* RPMTAG_HEADERIMMUTABLE = 63 (BIN)
+
+    A region tag marking the header as the other kind of header.
+
+* RPMTAG_HEADERI18NTABLE = 100 (STRING ARRAY)
+
+    A list of the locales used for i18n string values.
+
+* RPMSIGTAG_DSA = 267 (BIN)
+
+    This is a DSA signature of just the "immutable" header.
+
+* RPMSIGTAG_RSA = 268 (BIN)
+
+    This is an RSA signature of just the "immutable" header.
+
+* RPMSIGTAG_SHA1 = 269 (STRING)
+
+    This is the SHA1 checksum of just the "immutable" header. Also, this one is stored as a string
+    instead of as the binary checksum.
+
+* RPMSIGTAG_PGP = 1002 (BIN)
+
+    This is an RSA signature of the data contained in the "immutable" header and payload; i.e.,
+    everything after the signature header.
+
+* RPMSIGTAG_GPG = 1005 (BIN)
+
+    This is a DSA signature of the data contained in the "immutable" header and payload.
+
+* RPMTAG_BUILDTIME = 1006 (INT32)
+
+    The time the package was created, from time().
+
+* RPMTAG_BUILDHOST = 1007 (STRING)
+
+    The hostname of the system where the package was built.
+
+* RPMSIGTAG_PAYLOADSIZE = 1007 (INT32)
+
+    The uncompressed payload size in bytes.
+
+* RPMTAG_DISTRIBUTION = 1010 (STRING)
+
+    The distribution used the build the package, configurable via the '%{distribution}' macro
+    or the 'Distribution:' tag in a spec file. Not set by default. RHEL sets it to "Red Hat",
+    Fedora sets it to "Fedora Project".
+
+* RPMTAG_VENDOR = 1011 (STRING)
+
+    The vendor that built the package, configurable via the '%{vendor}' macro or the 'Vendor:' tag
+    in a spec file. Also not set by default. RHEL sets it to "Red Hat, Inc.", Fedora sets it to
+    "Fedora Project".
+
+* RPMTAG_PACKAGER = 1015 (STRING)
+
+    LSB claims that this is to describe the tool used to build the package, but no one does that, and
+    what would be the point. The string is configurable via the '%{packager}' macro or 'Packager:' spec
+    file tag, and it is not set by default. RHEL sets it to "Red Hat, Inc. <http://bugzilla.redhat.com/bugzilla>".
+    Fedora sets it to "Fedora Project".
+
+* RPMTAG_URL = 1020 (STRING)
+
+    URL for the upstream project.
+
+* RPMTAG_PREIN = 1023 (STRING)
+
+    The %pre script. Requires RPMTAG_PREINPROG to be set.
+
+* RPMTAG_POSTIN = 1024 (STRING)
+
+    The %post script. Requires RPMTAG_POSTINPROG to be set.
+
+* RPMTAG_PREUN = 1025 (STRING)
+
+    The %preun script. Requires RPMTAG_PREUNPROG to be set.
+
+* RPMTAG_POSTUN = 1026 (STRING)
+
+    The %postun script. Requires RPMTAG_POSTUNPROG to be set.
+
+* RPMTAG_OLDFILENAMES = 1027 (STRING ARRAY)
+
+    An array of the full paths of the files in the package. This tag is obsolete in favor of
+    the CompressedFileNames triple.
+
+* RPMTAG_FILEVERIFYFLAGS = 1045 (INT32)
+
+    This is an array of bitfields, describing what aspects of a file to verify. The bits are
+    controllable via %verify directives in spec files. %verify is not widely used, so usually
+    this value is 0xFFFFFFFF for every file, indicating that everything should be verified.
+
+    The possible bits are:
+
+        * RPMVERIFY_FILEDIGEST = (1 << 0)
+        * RPMVERIFY_FILESIZE = (1 << 1)
+        * RPMVERIFY_LINKTO = (1 << 2)
+        * RPMVERIFY_USER = (1 << 3)
+        * RPMVERIFY_GROUP = (1 << 4)
+        * RPMVERIFY_MTIME = (1 << 5)
+        * RPMVERIFY_MODE = (1 << 6)
+        * RPMVERIFY_RDEV = (1 << 7)
+        * RPMVERIFY_CAPS = (1 << 8)
+        * RPMVERIFY_CONTEXTS = (1 << 15)
+        * RPMVERIFY_READLINKFAIL = (1 << 28)
+        * RPMVERIFY_READFAIL = (1 << 29)
+        * RPMVERIFY_LSTATFAIL = (1 << 30)
+        * RPMVERIFY_LGETFILECONFAIL = (1 << 31)
+
+* RPMTAG_CHANGELOGTIME = 1080 (INT32)
+* RPMTAG_CHANGELOGNAME = 1081 (STRING ARRAY)
+* RPMTAG_CHANGELOGTEXT = 1082 (STRING ARRAY)
+
+    The values from these three array make up a changelog entry.
+
+    From a changelog entry in a spec file that looks like:
+
+       * Wed Dec 5 2018 Johnny Example <john@example.com> - 1.0-1
+       - change 1
+       - change 2
+
+    The time would be converted to a time()-style time, 1544011200,
+    RPMTAG_CHANGELOGNAME would be everything after the date, "Johnny Example <john@example.com> - 1.0-1",
+    and RPMTAG_CHANGELOGTEXT would be '- change 1\n- change 2'.
+
+* RPMTAG_CONFLICTFLAGS = 1053 (INT32)
+* RPMTAG_CONFLICTNAME = 1054 (STRING ARRAY)
+* RPMTAG_CONFLICTVERSION = 1055 (STRING ARRAY)
+
+    Conflicts data. See RPMTAG_REQUIREFLAGS for the meaning of the flag values.
+
+* RPMTAG_PREINPROG = 1085 (STRING)
+
+    The interpreter for %pre.
+
+* RPMTAG_POSTINPROG = 1086 (STRING)
+
+    The interpreter for %post
+
+* RPMTAG_PREUNPROG = 1087 (STRING)
+
+    The interpreter for %preun
+
+* RPMTAG_SOURCERPM = 1044 (STRING)
+
+    The filename of the SRPM used to build the package; e.g., "lorax-29.27-1.fc29.src.rpm".
+
+* RPMTAG_ARCHIVESIZE = 1046 (INT32)
+
+    The size of the uncompressed payload. So if the payload is a gzipped cpio file, this value
+    is the size of the uncompressed cpio file.
+
+* RPMTAG_RPMVERSION = 1064 (STRING)
+
+    The version of RPM used to build the package; e.g., "4.14.2.1".
+
+* RPMTAG_POSTUNPROG = 1088 (STRING)
+
+    The interpreter for %postun
+
+* RPMTAG_OBSOLETENAME = 1090 (STRING ARRAY)
+* RPMTAG_OBSOLETEFLAGS = 1114 (INT32)
+* RPMTAG_OBSOLETEVERSION = 1115 (STRING ARRAY)
+
+    Obsolete values. See RPMTAG_REQUIREFLAGS for the flag values.
+
+* RPMTAG_OPTFLAGS = 1122 (STRING)
+
+    The value of '%{optflags}' used when building the package. This of course
+    does not mean that the '%{optflags}' were actually used in %build.
+
+* RPMTAG_RHNPLATFORM = 1131 (STRING)
+
+    LSB explicitly marks this one as "deprecated". It used to be an arch string,
+    but it isn't used anymore.
+
+* RPMTAG_PLATFORM = 1132 (STRING)
+
+   LSB specifies this as "an opaque string whose contents are undefined." It's the
+   autotools-style platform string, e.g. "x86_64-redhat-linux-gnu".
+
+* RPMTAG_COOKIE = 1094 (STRING)
+
+    LSB specifies this one as "This tag contains an opaque string whose contents are undefined".
+    The contents are "<buildHost> <buildTime>", with the buildTime being the output of time().
+
+OTHER
+-----
+
+These are tags that are used by RPM but that are not described in LSB-5.0.0.
+
+* RPMSIGTAG_RESERVEDSPACE = 1008 (BIN)
+
+    Empty space reserved for adding signatures.
+
+* RPMSIGTAG_LONGSIZE = 270 (INT64)
+
+    This is a 64-bit substitute for RPMSIGTAG_SIZE.
+
+* RPMSIGTAG_LONGARCHIVESIZE = 271 (INT64)
+
+    This is a 64-bit substitute for RPMSIGTAG_PAYLOADSIZE.
+
+* RPMSIGTAG_SHA256 = 273 (STRING)
+
+    This is the SHA256 checksum of the "immutable" header. SHA256 checksums are
+    only generated if rpm is built against beecrypt. The copies of rpm distributed
+    in Fedora and RHEL use openssl as the crypto implementation, so SHA256 checksums
+    are frequently not available.
+
+    Like RPMSIGTAG_SHA1, this data is stored as a string instead of as binary data.
+
+ARCHAEOLOGY
+-----------
+
+All of these tags are dead. Some of them can be found in old RPMs, but for the most
+part RPMs that old have a different header structure, and handling that would be of
+greater concern than these tag values. The information here is mostly just in case
+anyone is curious about what these things crudding up the enums are.
+
+* RPMSIGTAG_BADSHA1_1 = 264 (BIN)
+
+    When SHA1 support was added, RPM reversed input words on big-endian
+    machines, like it does for MD5. The problem there is that the SHA1 algorithm
+    operates on words in network byte order, so the result was wrong for everyone.
+
+    This was RPMSIGTAG_SHA1HEADER, and RPMSIGTAG_SHA1HEADER moved to 265.
+
+* RPMSIGTAG_BADSHA1_2 = 265 (BIN)
+
+    I'm not sure anything was actually wrong with this one? It was removed
+    when rpmsign was changed to not allow multiple signatures (--addsign removed old
+    signatures just like --resign), but the actual SHA1 calculation remained the same,
+    I think. Who knows!
+
+    This was RPMSIGTAG_SHA1HEADER, and RPMSIGTAG_SHA1HEADER moved to 269.
+
+* RPMSIGTAG_FILESIGNATURES = 274 (STRING ARRAY)
+
+    These are an RSA signature of the SHA-256 checksum of each file, for use with IMA.
+    All of the data is stored as the hex value of the signature, as an array of strings.
+    The format is whatever is output by ima-evm-util's sign_hash function.
+
+    It's also completely broken. The signFile function, in order to determine whether a
+    given file digest is actually valid, creates an array of zeroes to memcmp against…and
+    then it passes the zeroes to ima-evm instead of the actual file hash.
+
+* RPMSIGTAG_FILESIGNATURELENGTH = 275 (INT32)
+
+    The length of the signatures stored in RPMSIGTAG_FILESIGNATURES (the binary version,
+    not the hex values that actually get stored).
+
+* RPMSIGTAG_LEMD5_1 = 1001 (BIN)
+
+    When MD5 signatures were originally added, the copy of md5.c being used expected
+    the user to set -DHIGHFIRST on big-endian machines, and no one ever did that. On big-endian
+    systems, MD5 signature tags were added as if the data consisted of byte-reversed 32-bit words. This
+    tag value was kept in order to continue to support RPMs with busted signatures.
+
+    SIGTAG_MD5 was renamed to SIGTAG_LITTLEENDIANMD5 in 2.2.5, and SIGTAG_MD5 was moved
+    to 1003. 1001 was later renamed to RPMSIGTAG_LEMD5_1 after the same thing happened
+    again, see RPMSIGTAG_LEMD5_2.
+
+* RPMSIGTAG_LEMD5_2 = 1003 (BIN)
+
+    2.3.3 introduced a bug that re-broke md5sum calculation on big-endian machines. This means
+    signatures from big-endian CPUs stored in tag 1001 are definitely broken, while signatures
+    from big-endian CPUs stored in tag 1003 are *maybe* broken.
+
+    Someone changed configure.in to use AC_CONFIG_HEADER, which means all of the flags and
+    stuff moves from command-line arguments substituted via @DEFS@ to #define's stored in
+    config.h. However, this was in days before autoheader, and no one added WORDS_BIGENDIAN
+    to config.h.in, so it just went missing. The issue was fixed in 2.3.9.
+
+    In 2.3.9, RPMSIGTAG_MD5 was renamed to RPMSIGTAG_LEMD5_2, and RPMSIGTAG_MD5 was moved to 1004.
+
+* RPMSIGTAG_PGP5 = 1006 (BIN)
+
+    RPM used to differentiate signatures based on the program that generated the signature
+    (pgp, gpg, pgp5) instead of the algorithm. This tag type was for signatures generated with
+    pgp5 instead of pgp version 2. Eventually this value was deprecated, since RSA signatures
+    created with pgp5 were still readable by pgp 2.
+
+* RPMTAG_DISTURL = 1123 (STRING)
+
+    This one is specified in the LSB for some reason, but no one uses it and it was never really
+    defined. The commit that added it back in 2000 mentions it being used to provided distribution
+    information to tools like rpmfind, and also mentions "content unknown yet".
