@@ -78,11 +78,9 @@ rpmTagType rpm_tag_get_type(rpmTag tag) {
         case RPMTAG_SIZE:
         case RPMTAG_FILESIZES:
         case RPMTAG_FILEMTIMES:
-        case RPMTAG_FILEMD5S:
         case RPMTAG_FILEFLAGS:
         case RPMTAG_FILEDEVICES:
         case RPMTAG_FILEINODES:
-        case RPMTAG_FILELANGS:
         case RPMTAG_PROVIDEFLAGS:
         case RPMTAG_REQUIREFLAGS:
         case RPMTAG_DIRINDEXES:
@@ -95,6 +93,8 @@ rpmTagType rpm_tag_get_type(rpmTag tag) {
         case RPMTAG_FILELINKTOS:
         case RPMTAG_FILEUSERNAME:
         case RPMTAG_FILEGROUPNAME:
+        case RPMTAG_FILELANGS:
+        case RPMTAG_FILEMD5S:
         case RPMTAG_PROVIDENAME:
         case RPMTAG_REQUIRENAME:
         case RPMTAG_REQUIREVERSION:

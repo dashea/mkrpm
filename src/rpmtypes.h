@@ -132,7 +132,7 @@ typedef enum rpmTag {
     RPMTAG_FILEMODES         = 1030,    /* int16 array */
     RPMTAG_FILERDEVS         = 1033,    /* int16 array */
     RPMTAG_FILEMTIMES        = 1034,    /* int32 array */
-    RPMTAG_FILEMD5S          = 1035,    /* int32 array */
+    RPMTAG_FILEMD5S          = 1035,    /* string array */
     RPMTAG_FILELINKTOS       = 1036,    /* string array */
     RPMTAG_FILEFLAGS         = 1037,    /* int32 array */
     RPMTAG_FILEUSERNAME      = 1039,    /* string array */
@@ -143,7 +143,7 @@ typedef enum rpmTag {
     RPMTAG_REQUIREVERSION    = 1050,    /* string array */
     RPMTAG_FILEDEVICES       = 1095,    /* int32 array */
     RPMTAG_FILEINODES        = 1096,    /* int32 array */
-    RPMTAG_FILELANGS         = 1097,    /* int32 array */
+    RPMTAG_FILELANGS         = 1097,    /* string array */
     RPMTAG_PROVIDEFLAGS      = 1112,    /* int32 array */
     RPMTAG_PROVIDEVERSION    = 1113,    /* string array */
     RPMTAG_DIRINDEXES        = 1116,    /* int32 array */
