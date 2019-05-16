@@ -152,6 +152,7 @@ typedef enum rpmTag {
     RPMTAG_PAYLOADFORMAT     = 1124,    /* string */
     RPMTAG_PAYLOADCOMPRESSOR = 1125,    /* string */
     RPMTAG_PAYLOADFLAGS      = 1126,    /* string */
+    RPMTAG_MAX
 } rpmTag;
 
 /* Type values */

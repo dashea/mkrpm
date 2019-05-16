@@ -1,4 +1,6 @@
 bin_PROGRAMS = mkrpm
 
 mkrpm_SOURCES = mkrpm.c \
-		rpmtypes.h
+		rpmtypes.h \
+		tagdb.c \
+		tagdb.h
