@@ -30,8 +30,8 @@ tag_db * init_tag_db(void);
 void free_tag_db(tag_db *);
 
 /* Map a tag value to a type */
-rpmTagType rpmTagGetType(rpmTag);
-rpmTagType rpmSigTagGetType(rpmSigTag);
+rpmTagType rpm_tag_get_type(rpmTag);
+rpmTagType rpm_sig_tag_get_type(rpmSigTag);
 
 /* Add a tag to the db */
 int add_tag(tag_db *, rpmTag, const void *, size_t);

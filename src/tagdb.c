@@ -88,7 +88,7 @@ void free_tag_db(tag_db *db) {
     free(db);
 }
 
-rpmTagType rpmTagGetType(rpmTag tag) {
+rpmTagType rpm_tag_get_type(rpmTag tag) {
     switch (tag) {
         case RPMTAG_NAME:
         case RPMTAG_VERSION:
@@ -140,7 +140,7 @@ rpmTagType rpmTagGetType(rpmTag tag) {
     }
 }
 
-rpmTagType rpmSigTagGetType(rpmSigTag tag) {
+rpmTagType rpm_sig_tag_get_type(rpmSigTag tag) {
     switch (tag) {
         case RPMSIGTAG_SIZE:
             return RPM_INT32_TYPE;
