@@ -1,11 +1,14 @@
 .deps
 .libs
+*.gcno
 *.la
 *.lo
 *.o
+*-coverage*
 Makefile
 Makefile.in
 /aclocal.m4
+/aminclude_static.am
 /autom4te.cache
 /compile
 /config.guess
@@ -19,7 +22,8 @@ Makefile.in
 /install-sh
 /libtool
 /ltmain.sh
-/m4
+/m4/libtool.m4
+/m4/lt*.m4
 /missing
 /stamp-h1
 /src/mkrpm
