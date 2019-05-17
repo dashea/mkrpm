@@ -31,7 +31,14 @@ AC_TYPE_SIZE_T
 # Checks for library functions.
 AC_FUNC_REALLOC
 
+# Checks for pkg-config modules
+PKG_CHECK_MODULES([CMOCKA], [cmocka])
+
+AC_SUBST([CMOCKA_CFLAGS])
+AC_SUBST([CMOCKA_LIBS])
+
 AC_CONFIG_FILES([Makefile
                  src/Makefile
+                 tests/Makefile
                  utils/Makefile])
 AC_OUTPUT

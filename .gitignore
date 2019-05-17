@@ -23,3 +23,7 @@ Makefile.in
 /missing
 /stamp-h1
 /src/mkrpm
+/test-driver
+/tests/*.log
+/tests/*.trs
+/tests/test-tagdb
