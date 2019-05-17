@@ -26,37 +26,6 @@
 
 #include "tagdb.h"
 
-struct tag_entry {
-    uint32_t count;
-    size_t data_used;
-    size_t data_total;
-    void *data;
-};
-
-/* linked list of tags actually used, since there's only 30-some that will
- * actually be populated in tagDb.entries. Tags that are populated in entries
- * will also be stored in tagDb.tagList, so that this list can iterated over
- * to output the final tag store, instead of iterating over all 1000-some
- * possible values in entries.
- */
-typedef struct _tag_list_entry {
-    rpmTag tag;
-    SLIST_ENTRY(_tag_list_entry) items;
-} tag_list_entry;
-
-typedef SLIST_HEAD(_tag_list, _tag_list_entry) tag_list;
-
-struct tag_db {
-    /* An array of the individual tags, indexed by the tag value.
-     * The tag values only go up to 5096, and the biggest we care about is
-     * 1126, so this isn't that huge.
-     */
-    struct tag_entry *entries[RPMTAG_MAX];
-
-    /* List of tags that appear in entries */
-    tag_list tags_used;
-};
-
 tag_db * init_tag_db(void) {
     tag_db *ret;
 
