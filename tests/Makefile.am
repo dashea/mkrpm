@@ -1,3 +1,5 @@
+@VALGRIND_CHECK_RULES@
+
 TESTS = test-tagdb
 
 check_PROGRAMS = $(TESTS)
