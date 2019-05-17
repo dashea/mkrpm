@@ -19,7 +19,7 @@ AC_PROG_INSTALL
 # Checks for libraries.
 
 # Checks for header files.
-AC_CHECK_HEADERS([stdint.h stdlib.h sys/queue.h])
+AC_CHECK_HEADERS([stdint.h sys/queue.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_INT8_T
