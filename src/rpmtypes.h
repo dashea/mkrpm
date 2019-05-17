@@ -115,6 +115,7 @@ struct rpmhdrindex {
 typedef enum rpmSigTag {
     RPMSIGTAG_SIZE = 1000,  /* int32 */
     RPMSIGTAG_MD5  = 1004,  /* bin */
+    RPMSIGTAG_MAX
 } rpmSigTag;
 
 typedef enum rpmTag {

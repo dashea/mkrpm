@@ -143,6 +143,8 @@ int add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
         list_entry = calloc(1, sizeof(*list_entry));
 
         if (list_entry == NULL) {
+            free(db->entries[tag]);
+            db->entries[tag] = NULL;
             return -1;
         }
 
@@ -158,10 +160,23 @@ int add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
     if (data_avail < data_size) {
         /* Round up the amount of space allocated to the next multiple of BUFSIZ */
         space_to_add = data_size - data_avail;
-        space_to_add += BUFSIZ - (space_to_add % BUFSIZ);
+
+        if (space_to_add % BUFSIZ) {
+            space_to_add += BUFSIZ - (space_to_add % BUFSIZ);
+        }
 
         tmp = realloc(entry->data, entry->data_total + space_to_add);
         if (tmp == NULL) {
+            /* If this was a new entry, clean up the empty entry */
+            if (entry->data_total == 0) {
+                free(entry);
+                db->entries[tag] = NULL;
+
+                list_entry = SLIST_FIRST(&db->tags_used);
+                SLIST_REMOVE_HEAD(&db->tags_used, items);
+                free(list_entry);
+            }
+
             return -1;
         }
 
