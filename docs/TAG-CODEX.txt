@@ -419,16 +419,13 @@ OPTIONAL
     Conflicts data. See RPMTAG_REQUIREFLAGS for the meaning of the flag values.
 
 * RPMTAG_PREINPROG = 1085 (STRING)
-
-    The interpreter for %pre.
-
 * RPMTAG_POSTINPROG = 1086 (STRING)
-
-    The interpreter for %post
-
 * RPMTAG_PREUNPROG = 1087 (STRING)
 
-    The interpreter for %preun
+    The interpreter for %pre, %post, and %preun, respectively.
+
+    Sometimes the type is RPM_STRING_ARRAY_TYPE, see the note on
+    rpmlib(ScriptletInterpreterArgs).
 
 * RPMTAG_SOURCERPM = 1044 (STRING)
 
@@ -445,7 +442,8 @@ OPTIONAL
 
 * RPMTAG_POSTUNPROG = 1088 (STRING)
 
-    The interpreter for %postun
+    The interpreter for %postun. The type may be RPM_STRING_ARRAY_TYPE, see
+    the note on rpmlib(ScriptletInterpreterArgs).
 
 * RPMTAG_OBSOLETENAME = 1090 (STRING ARRAY)
 * RPMTAG_OBSOLETEFLAGS = 1114 (INT32)
@@ -499,6 +497,15 @@ These are tags that are used by RPM but that are not described in LSB-5.0.0.
 
     Like RPMSIGTAG_SHA1, this data is stored as a string instead of as binary data.
 
+* RPMTAG_VERIFYSCRIPTPROG = 1091 (STRING)
+
+    The interpreter for the %verify scriptlet. The type may be RPM_STRING_ARRAY_TYPE,
+    see the note on rpmlib(ScriptletInterpreterArgs).
+
+* RPMTAG_TRIGGERSCRIPTPROG = 1091 (STRING)
+
+    The interpreter for trigger scripts.
+
 ARCHAEOLOGY
 -----------
 
@@ -531,7 +538,7 @@ anyone is curious about what these things crudding up the enums are.
     The format is whatever is output by ima-evm-util's sign_hash function.
 
     It's also completely broken. The signFile function, in order to determine whether a
-    given file digest is actually valid, creates an array of zeroes to memcmp against…and
+    given file digest is actually valid, creates an array of zeroes to memcmp against...and
     then it passes the zeroes to ima-evm instead of the actual file hash.
 
 * RPMSIGTAG_FILESIGNATURELENGTH = 275 (INT32)
@@ -575,3 +582,143 @@ anyone is curious about what these things crudding up the enums are.
     This one is specified in the LSB for some reason, but no one uses it and it was never really
     defined. The commit that added it back in 2000 mentions it being used to provided distribution
     information to tools like rpmfind, and also mentions "content unknown yet".
+
+RPMLIB FEATURES
+===============
+
+These are strings that are included in the package requirements with RPMSENSE_RPMLIB set.
+They indicate that correctly interpreting the package requires support for a particular
+feature.
+
+The versions for the features are always expressed as "<= <version>". I would think that
+>= would be more correct, but that's the way it is.
+
+* rpmlib(BuiltinLuaScripts) <= 4.2.2-1
+
+    Scriptlets use the builtin lua interpreter.
+
+* rpmlib(CaretInVersions) <= 4.15.0-1
+
+    Indicates that somewhere in the PRCO/etc data for this package is a version number
+    containing a caret. Carets sort higher than \0, but lower than everything else.
+
+* rpmlib(CompresedFileNames) <= 3.0.4-1
+
+    Instead of storing paths in RPMTAG_OLDFILENAMES, the paths are stored in the
+    RPMTAG_DIRINDEXES, RPMTAG_BASENAMES, RPMTAG_DIRNAMES triple.
+
+* rpmlib(ConcurrentAccess) <= 4.1-1
+
+    This is provided by rpm to indicate that package scriptlets can access the rpm
+    database. rpmbuild never sets this as a requirement.
+
+* rpmlib(ExplicitPackageProvide) <= 4.0-1
+
+    This one is a mystery. RPM provides the dependency, and indicates that this is to
+    mean the package provides it's 'N = E:V-R' Provides explicitly through
+    RPMTAG_PROVIDENAME, instead of implicitly, which is how packages do things nowadays.
+    But rpmbuild has never actually added this requirement as far as I can tell.
+
+* rpmlib(FileCaps) <= 4.6.1-1
+
+    Indicates the RPM uses RPMTAG_FILECAPS
+
+* rpmlib(FileDigests) <= 4.4.90-1
+
+    This indicates the values stored in RPMTAG_FILEMD5 may be using an algorithm
+    other than md5, as specified in RPMTAG_FILEDIGESTALGO.
+
+* rpmlib(HeaderLoadSortsTags) <= 4.0.1-1
+
+    This is provided by RPM to indicate that header tags are sorted after loading
+    the header, and I cannot think of a single reason a package would care about that.
+
+* rpmlib(LargeFiles) <= 4.12.0-1
+
+    Since the newc cpio header stores file lengths as 8 hexadecimal digits, the largest
+    file that can be stored in a cpio payload is 4GB. For files longer than this, rpm
+    does a few things differently:
+
+       * store the file sizes in RPMTAG_LONGFILESIZES, instead of RPMTAG_FILESIZES.
+         RPMTAG_LONGFILESIZES is an array of 64-bit integers.
+
+       * instead of a newc-formatted cpio payload, RPM outputs a "stripped" cpio,
+         which is a format of its own invention. The header format is:
+
+	 ```
+	 struct cpio_stripped_header {
+	     char c_magic[6];
+	     char c_fx[8];
+	 };
+         ```
+
+	 c_magic is the characters "07070X". c_fx is the index into the RPM header's
+	 array that contain the metadata for this file. Like newc, c_fx is 8 ASCII
+	 hexadecimal digits.
+
+* rpmlib(PartialHardlinkSets) <= 4.0.4-1
+
+    rpmbuild sets this requirement on any RPM that contains hard links in the payload.
+    I'm honestly not sure what rpm does with this information on the other end. It appears
+    to have something to do with being able to install only some of the files from a set
+    of hardlinks, so I guess this is to indicate that rpm is smart enough to not just
+    naively store the nlink metadata as-is in the database. Seems pretty dumb to be honest.
+
+* rpmlib(PayloadFilesHavePrefix) <= 4.0-1
+
+    Indicates that the path in the payload file (c_filesize of non-LargeFiles cpio payloads)
+    start with "./" instead of "/", which makes the payloads easier to handle with
+    rpm2cpio.
+
+* rpmlib(PayloadIsBzip2) <= 3.0.5-1
+
+    Indicates the payload is compressed with bzip2 instead of gzip.
+
+* rpmlib(PayloadIsLzma) <= 4.4.6-1
+
+    Indicates the payload is compressed with lzma instead of gzip
+
+* rpmlib(PayloadIsXz) <= 5.2-1
+
+    Indicates the payload is compressed with xz instead of gzip.
+
+* rpmlib(PayloadIsZstd) <= 5.4.18-1
+
+    Indicates the payload is compressed with zstd instead of gzip.
+
+* rpmlib(PreTransactionSyscalls) <= 4.0-1
+
+    This one is no longer used. It was part of an early attempt at fixing
+    scriptlet bugs with %pretransaction and %posttransaction scriptlets.
+
+* rpmlib(RichDependencies) <= 4.12.0-1
+
+    Rich/boolean dependencies are used by this RPM.
+
+* rpmlib(ScriptletExpansion) <= 4.9.0-1
+
+    Scriptlets use runtime macro expansion.
+
+* rpmlib(ScriptletInterpreterArgs) <= 4.0.3-1
+
+    If the scriptlet interpreter is specified with arguments (e.g., %post -p "/bin/sh -e"),
+    then the RPMTAG_*PROG value will be written as a RPM_STRING_ARRAY_TYPE instead
+    of as RPM_STRING_TYPE, and this requirement will be set.
+
+* rpmlib(ShortCircuited) <= 4.9.0-1
+
+    This dependency is added by rpmbuild when testing build stages with --short-circuit.
+    rpm itself does not provide the dependency, so the resulting package is not installable
+    without --nodeps.
+
+* rpmlib(TildeInVersions) <= 4.10.0-1
+
+    Indicates that somewhere in the provides/requires/etc data for this package,
+    there is a version number containing a tilde, and that the tilde should be sorted
+    before \0 by rpmvercmp.
+
+* rpmlib(VersionedDependencies) <= 3.0.3-1
+
+    This one is no longer used. It used to indicate that PRCO data included versions,
+    but that's now just assumed. RPM still provides the dependency, but rpmbuild doesn't
+    bother to add it to packages.
