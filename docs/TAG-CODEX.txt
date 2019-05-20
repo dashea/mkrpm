@@ -656,6 +656,8 @@ The versions for the features are always expressed as "<= <version>". I would th
 	 array that contain the metadata for this file. Like newc, c_fx is 8 ASCII
 	 hexadecimal digits.
 
+	 The cpio file is terminated with a newc (magic 070701) TRAILER!!! record.
+
 * rpmlib(PartialHardlinkSets) <= 4.0.4-1
 
     rpmbuild sets this requirement on any RPM that contains hard links in the payload.
