@@ -123,14 +123,13 @@ int add_payload_entry(struct archive *archive, struct archive_entry *entry) {
 }
 
 /* Add the given file to the CPIO payload, using write_func + output_handle to write the data
+ * link_target must be a buffer of size PATH_MAX
  * Return 0 on success, and write the stat info for the file to sbuf.
  * Return -1 on failure.
  */
-int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolver *resolver, const char *pathname, struct stat *sbuf) {
+int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolver *resolver, const char *pathname, struct stat *sbuf, char *link_target) {
     struct archive_entry *entry = NULL;
     struct archive_entry *sparse = NULL;
-
-    char link_buffer[PATH_MAX];
 
     int returncode = -1;
 
@@ -138,6 +137,7 @@ int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolv
     assert(resolver != NULL);
     assert(pathname != NULL);
     assert(sbuf != NULL);
+    assert(link_target != NULL);
 
     /* Stat the file */
     if (lstat(pathname, sbuf) != 0) {
@@ -163,12 +163,14 @@ int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolv
 
     /* If this is a symlink, set the symlink destination */
     if (S_ISLNK(sbuf->st_mode)) {
-        if (readlink(pathname, link_buffer, sizeof(link_buffer)) < 0) {
+        if (readlink(pathname, link_target, PATH_MAX) < 0) {
             fprintf(stderr, "Unable to readlink at %s: %s\n", pathname, strerror(errno));
             goto cleanup;
         }
 
-        archive_entry_set_symlink(entry, link_buffer);
+        archive_entry_set_symlink(entry, link_target);
+    } else {
+        *link_target = '\0';
     }
 
     /* Run everything through the hardlink resolver */

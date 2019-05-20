@@ -25,7 +25,7 @@
 #include <archive_entry.h>
 
 struct archive * init_archive(FILE *, struct archive_entry_linkresolver **);
-int add_file_to_payload(struct archive *, struct archive_entry_linkresolver *, const char *, struct stat *);
+int add_file_to_payload(struct archive *, struct archive_entry_linkresolver *, const char *, struct stat *, char *);
 int finish_archive(struct archive *, struct archive_entry_linkresolver *);
 
 #endif
