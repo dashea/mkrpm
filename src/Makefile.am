@@ -5,11 +5,14 @@ bin_PROGRAMS = mkrpm
 noinst_LTLIBRARIES = libmkrpm.la
 
 libmkrpm_la_SOURCES = rpmtypes.h \
+		      payload_cpio.c \
+		      payload_cpio.h \
 		      tagdb.c \
 		      tagdb.h
+
 libmkrpm_la_CPPFLAGS = $(CODE_COVERAGE_CPPFLAGS)
-libmkrpm_la_CFLAGS = $(CODE_COVERAGE_CFLAGS)
-libmkrpm_la_LIBADD = $(CODE_COVERAGE_LIBS)
+libmkrpm_la_CFLAGS = $(CODE_COVERAGE_CFLAGS) $(LIBARCHIVE_CFLAGS)
+libmkrpm_la_LIBADD = $(CODE_COVERAGE_LIBS) $(LIBARCHIVE_LIBS)
 
 mkrpm_SOURCES = mkrpm.c
 mkrpm_LDADD = libmkrpm.la

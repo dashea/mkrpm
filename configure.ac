@@ -34,15 +34,19 @@ AC_TYPE_UINT8_T
 AC_TYPE_INT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
 
 # Checks for library functions.
 AC_FUNC_REALLOC
 
 # Checks for pkg-config modules
 PKG_CHECK_MODULES([CMOCKA], [cmocka])
+PKG_CHECK_MODULES([LIBARCHIVE], [libarchive])
 
 AC_SUBST([CMOCKA_CFLAGS])
 AC_SUBST([CMOCKA_LIBS])
+AC_SUBST([LIBARCHIVE_CFLAGS])
+AC_SUBST([LIBARCHIVE_LIBS])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
