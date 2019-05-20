@@ -18,6 +18,7 @@
 
 #include "config.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -138,12 +139,14 @@ int add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
         db->entries[tag] = calloc(1, sizeof(*(db->entries[tag])));
 
         if (db->entries[tag] == NULL) {
+            fprintf(stderr, "Unable to allocate memory: %s\n", strerror(errno));
             return -1;
         }
 
         list_entry = calloc(1, sizeof(*list_entry));
 
         if (list_entry == NULL) {
+            fprintf(stderr, "Unable to allocate memory: %s\n", strerror(errno));
             free(db->entries[tag]);
             db->entries[tag] = NULL;
             return -1;
@@ -168,6 +171,8 @@ int add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
 
         tmp = realloc(entry->data, entry->data_total + space_to_add);
         if (tmp == NULL) {
+            fprintf(stderr, "Unable to allocate memory: %s\n", strerror(errno));
+
             /* If this was a new entry, clean up the empty entry */
             if (entry->data_total == 0) {
                 free(entry);
