@@ -616,7 +616,7 @@ The versions for the features are always expressed as "<= <version>". I would th
 
     This one is a mystery. RPM provides the dependency, and indicates that this is to
     mean the package provides it's 'N = E:V-R' Provides explicitly through
-    RPMTAG_PROVIDENAME, instead of implicitly, which is how packages do things nowadays.
+    RPMTAG_PROVIDENAME which is how packages do things nowadays, instead of implicitly.
     But rpmbuild has never actually added this requirement as far as I can tell.
 
 * rpmlib(FileCaps) <= 4.6.1-1
