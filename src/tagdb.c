@@ -90,6 +90,7 @@ rpmTagType rpm_tag_get_type(rpmTag tag) {
         case RPMTAG_FILERDEVS:
             return RPM_INT16_TYPE;
 
+        case RPMTAG_HEADERI18NTABLE:
         case RPMTAG_FILELINKTOS:
         case RPMTAG_FILEUSERNAME:
         case RPMTAG_FILEGROUPNAME:

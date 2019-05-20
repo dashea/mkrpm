@@ -119,6 +119,7 @@ typedef enum rpmSigTag {
 } rpmSigTag;
 
 typedef enum rpmTag {
+    RPMTAG_HEADERI18NTABLE   = 100,     /* string array */
     RPMTAG_NAME              = 1000,    /* string */
     RPMTAG_VERSION           = 1001,    /* string */
     RPMTAG_RELEASE           = 1002,    /* string */
