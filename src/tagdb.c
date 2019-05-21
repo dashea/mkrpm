@@ -32,6 +32,7 @@ tag_db * init_tag_db(void) {
 
     ret = calloc(1, sizeof(*ret));
     if (ret == NULL) {
+        fprintf(stderr, "Unable to allocate tag database: %s\n", strerror(errno));
         return NULL;
     }
 
@@ -58,7 +59,7 @@ void free_tag_db(tag_db *db) {
     free(db);
 }
 
-rpmTagType rpm_tag_get_type(rpmTag tag) {
+rpmTagType rpm_tag_get_type(int tag) {
     switch (tag) {
         case RPMTAG_NAME:
         case RPMTAG_VERSION:
@@ -111,7 +112,7 @@ rpmTagType rpm_tag_get_type(rpmTag tag) {
     }
 }
 
-rpmTagType rpm_sig_tag_get_type(rpmSigTag tag) {
+rpmTagType rpm_sig_tag_get_type(int tag) {
     switch (tag) {
         case RPMSIGTAG_SIZE:
             return RPM_INT32_TYPE;

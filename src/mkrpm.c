@@ -34,6 +34,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 
+#include "output.h"
 #include "payload_cpio.h"
 #include "rpmtypes.h"
 #include "tagdb.h"
@@ -194,10 +195,6 @@ static int add_file(tag_db *tags, struct archive *archive, struct archive_entry_
     }
 
     return 0;
-}
-
-static int output_rpm(tag_db *tags, const void *payload, size_t payload_size, FILE *output) {
-    return -1;
 }
 
 int main(int argc, char **argv) {

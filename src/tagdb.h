@@ -39,7 +39,7 @@ struct tag_entry {
  * possible values in entries.
  */
 typedef struct _tag_list_entry {
-    rpmTag tag;
+    int tag;
     SLIST_ENTRY(_tag_list_entry) items;
 } tag_list_entry;
 
@@ -60,8 +60,8 @@ tag_db * init_tag_db(void);
 void free_tag_db(tag_db *);
 
 /* Map a tag value to a type */
-rpmTagType rpm_tag_get_type(rpmTag);
-rpmTagType rpm_sig_tag_get_type(rpmSigTag);
+rpmTagType rpm_tag_get_type(int);
+rpmTagType rpm_sig_tag_get_type(int);
 
 /* Add a tag to the db */
 int add_tag(tag_db *, rpmTag, const void *, size_t);
