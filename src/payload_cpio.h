@@ -20,12 +20,15 @@
 #define _PAYLOAD_CPIO_H
 
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include <archive.h>
 #include <archive_entry.h>
 
+#include "tagdb.h"
+
 struct archive * init_archive(FILE *, struct archive_entry_linkresolver **);
-int add_file_to_payload(struct archive *, struct archive_entry_linkresolver *, const char *, struct stat *, char *);
-int finish_archive(struct archive *, struct archive_entry_linkresolver *);
+int add_file_to_payload(struct archive *, struct archive_entry_linkresolver *, tag_db *, const char *, struct stat *);
+int finish_archive(struct archive *, struct archive_entry_linkresolver *, tag_db *);
 
 #endif

@@ -21,9 +21,6 @@
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
-#include <grp.h>
-#include <limits.h>
-#include <pwd.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,106 +87,12 @@ static int add_dir(tag_db *tags, struct archive *archive, struct archive_entry_l
 }
 
 static int add_file(tag_db *tags, struct archive *archive, struct archive_entry_linkresolver *resolver, const char *path) {
-    char link_target[PATH_MAX];
     struct stat sbuf;
 
-    struct passwd *pwd;
-    char uid_buf[12] = { 0 };
-
-    struct group *grp;
-    char gid_buf[12] = { 0 };
-
-    uint32_t u32_buf;
-
     /* Add the file to the payload, and in doing so get the stat info */
-    if (add_file_to_payload(archive, resolver, path, &sbuf, link_target) != 0) {
+    if (add_file_to_payload(archive, resolver, tags, path, &sbuf) != 0) {
         return -1;
     }
-
-    /* Add the file's metadata to the RPM header */
-    if (sbuf.st_size > UINT32_MAX) {
-        fprintf(stderr, "File %s is too large to be stored\n", path);
-        return -1;
-    }
-
-    u32_buf = (uint32_t) sbuf.st_size;
-    if (add_tag(tags, RPMTAG_FILESIZES, &u32_buf, sizeof(u32_buf)) != 0) {
-        return -1;
-    }
-
-    u32_buf = (uint32_t) sbuf.st_mode;
-    if (add_tag(tags, RPMTAG_FILEMODES, &u32_buf, sizeof(u32_buf)) != 0) {
-        return -1;
-    }
-
-    u32_buf = (uint32_t) sbuf.st_rdev;
-    if (add_tag(tags, RPMTAG_FILERDEVS, &u32_buf, sizeof(u32_buf)) != 0) {
-        return -1;
-    }
-
-    if (sbuf.st_mtime > UINT32_MAX) {
-        fprintf(stderr, "%s: RPM is not Y2K38 compliant\n", path);
-        return -1;
-    }
-
-    u32_buf = (uint32_t) sbuf.st_mtime;
-    if (add_tag(tags, RPMTAG_FILEMTIMES, &u32_buf, sizeof(u32_buf)) != 0) {
-        return -1;
-    }
-
-    /* XXX RPMTAG_FILEMD5S */
-
-    if (add_tag(tags, RPMTAG_FILELINKTOS, link_target, strlen(link_target) + 1) != 0) {
-        return -1;
-    }
-
-    /* XXX maybe make file flags configurable by config at some point */
-    u32_buf = 0;
-    if (add_tag(tags, RPMTAG_FILEFLAGS, &u32_buf, sizeof(u32_buf)) != 0) {
-        return -1;
-    }
-
-    /* If the uid/gid are not resolvable to names, convert the ID to a string */
-    if ((pwd = getpwuid(sbuf.st_uid)) == NULL) {
-        (void) snprintf(uid_buf, sizeof(uid_buf), "%u", (unsigned int) sbuf.st_uid);
-
-        if (add_tag(tags, RPMTAG_FILEUSERNAME, uid_buf, strlen(uid_buf) + 1) != 0) {
-            return -1;
-        }
-    } else {
-        if (add_tag(tags, RPMTAG_FILEUSERNAME, pwd->pw_name, strlen(pwd->pw_name) + 1) != 0) {
-            return -1;
-        }
-    }
-
-    if ((grp = getgrgid(sbuf.st_gid)) == NULL) {
-        (void) snprintf(gid_buf, sizeof(gid_buf), "%u", (unsigned int) sbuf.st_gid);
-
-        if (add_tag(tags, RPMTAG_FILEGROUPNAME, gid_buf, strlen(gid_buf) + 1) != 0) {
-            return -1;
-        }
-    } else {
-        if (add_tag(tags, RPMTAG_FILEGROUPNAME, grp->gr_name, strlen(grp->gr_name) + 1) != 0) {
-            return -1;
-        }
-    }
-
-    u32_buf = (uint32_t) sbuf.st_dev;
-    if (add_tag(tags, RPMTAG_FILEDEVICES, &u32_buf, sizeof(u32_buf)) != 0) {
-        return -1;
-    }
-
-    u32_buf = (uint32_t) sbuf.st_ino;
-    if (add_tag(tags, RPMTAG_FILEINODES, &u32_buf, sizeof(u32_buf)) != 0) {
-        return -1;
-    }
-
-    if (add_tag(tags, RPMTAG_FILELANGS, "", 1) != 0) {
-        return -1;
-    }
-
-    /* XXX DIRINDEXES/BASENAMES/DIRNAMES */
-    /* Need a new object to keep track of which directories are already added */
 
     /* if this is a directory, recurse */
     if (S_ISDIR(sbuf.st_mode)) {
@@ -288,7 +191,7 @@ int main(int argc, char **argv) {
     }
 
     /* Finalize the payload */
-    if (finish_archive(archive, resolver) != 0) {
+    if (finish_archive(archive, resolver, tags) != 0) {
         exit(EXIT_FAILURE);
     }
 

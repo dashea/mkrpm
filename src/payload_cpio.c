@@ -32,6 +32,7 @@
 #include <archive_entry.h>
 
 #include "payload_cpio.h"
+#include "tagdb.h"
 
 struct archive * init_archive(FILE *output, struct archive_entry_linkresolver **resolver_out) {
     struct archive *archive;
@@ -79,8 +80,11 @@ struct archive * init_archive(FILE *output, struct archive_entry_linkresolver **
     return archive;
 }
 
-int add_payload_entry(struct archive *archive, struct archive_entry *entry) {
+static int add_payload_entry(struct archive *archive, struct archive_entry *entry, tag_db *tags) {
     const char *sourcepath;
+    const struct stat *sbuf;
+    struct stat restat;
+    const char *link_target;
     int fd;
     char buffer[BUFSIZ];
     ssize_t bytes_read;
@@ -93,8 +97,35 @@ int add_payload_entry(struct archive *archive, struct archive_entry *entry) {
         return -1;
     }
 
+    sourcepath = archive_entry_sourcepath(entry);
+
+    /*
+     * Add the metadata to the RPM header.
+     * If this is a hardlink with a size of 0, re-stat the file. The linkresolver
+     * may have unset the size in order to write a hardlink entry, and we need the actual
+     * stat size for RPM's metadata.
+     */
+    sbuf = archive_entry_stat(entry);
+    if (S_ISREG(sbuf->st_mode) && (sbuf->st_nlink > 1) && (sbuf->st_size == 0)) {
+        if (lstat(sourcepath, &restat) != 0) {
+            fprintf(stderr, "Unable to stat %s: %s\n", sourcepath, strerror(errno));
+            return -1;
+        }
+
+        sbuf = &restat;
+    }
+
+    if (S_ISLNK(sbuf->st_mode)) {
+        link_target = archive_entry_symlink(entry);
+    } else {
+        link_target = "";
+    }
+
+    if (add_file_tags(tags, sourcepath, sbuf, link_target) != 0) {
+        return -1;
+    }
+
     if ((archive_entry_filetype(entry) == AE_IFREG) && (archive_entry_size(entry) > 0)) {
-        sourcepath = archive_entry_sourcepath(entry);
         fd = open(sourcepath, O_RDONLY);
 
         if (fd == -1) {
@@ -123,11 +154,11 @@ int add_payload_entry(struct archive *archive, struct archive_entry *entry) {
 }
 
 /* Add the given file to the CPIO payload, using write_func + output_handle to write the data
- * link_target must be a buffer of size PATH_MAX
  * Return 0 on success, and write the stat info for the file to sbuf.
  * Return -1 on failure.
  */
-int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolver *resolver, const char *pathname, struct stat *sbuf, char *link_target) {
+int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolver *resolver, tag_db *tags, const char *pathname, struct stat *sbuf) {
+    char link_target[PATH_MAX];
     struct archive_entry *entry = NULL;
     struct archive_entry *sparse = NULL;
 
@@ -135,9 +166,8 @@ int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolv
 
     assert(archive != NULL);
     assert(resolver != NULL);
+    assert(tags != NULL);
     assert(pathname != NULL);
-    assert(sbuf != NULL);
-    assert(link_target != NULL);
 
     /* Stat the file */
     if (lstat(pathname, sbuf) != 0) {
@@ -169,8 +199,6 @@ int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolv
         }
 
         archive_entry_set_symlink(entry, link_target);
-    } else {
-        *link_target = '\0';
     }
 
     /* Run everything through the hardlink resolver */
@@ -178,13 +206,13 @@ int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolv
 
     /* Add any entries that came back from the resolver */
     if (entry != NULL) {
-        if (add_payload_entry(archive, entry) != 0) {
+        if (add_payload_entry(archive, entry, tags) != 0) {
             goto cleanup;
         }
     }
 
     if (sparse != NULL) {
-        if (add_payload_entry(archive, sparse) != 0) {
+        if (add_payload_entry(archive, sparse, tags) != 0) {
             goto cleanup;
         }
     }
@@ -203,7 +231,7 @@ cleanup:
     return returncode;
 }
 
-int finish_archive(struct archive *archive, struct archive_entry_linkresolver *resolver) {
+int finish_archive(struct archive *archive, struct archive_entry_linkresolver *resolver, tag_db *tags) {
     struct archive_entry *entry;
 
     /* Unused, but the argument to archive_entry_linkify must be non-NULL */
@@ -218,7 +246,7 @@ int finish_archive(struct archive *archive, struct archive_entry_linkresolver *r
         archive_entry_linkify(resolver, &entry, &sparse);
 
         if (entry != NULL) {
-            if (add_payload_entry(archive, entry) != 0) {
+            if (add_payload_entry(archive, entry, tags) != 0) {
                 return -1;
             }
 
