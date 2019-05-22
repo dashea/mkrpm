@@ -60,6 +60,10 @@ static int add_dir(tag_db *tags, struct archive *archive, struct archive_entry_l
     }
 
     while ((dirent = readdir(dir)) != NULL) {
+        if ((strcmp(dirent->d_name, ".") == 0) || (strcmp(dirent->d_name, "..") == 0)) {
+            continue;
+        }
+
         if (asprintf(&entry_path, "%s/%s", path, dirent->d_name) < 0) {
             fprintf(stderr, "Unable to construct path for %s/%s: %s\n", path, dirent->d_name, strerror(errno));
             closedir(dir);
