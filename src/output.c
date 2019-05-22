@@ -27,6 +27,8 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 
+#include <openssl/md5.h>
+
 #include "output.h"
 #include "rpmtypes.h"
 #include "tagdb.h"
@@ -272,6 +274,10 @@ int output_rpm(tag_db *tags, const void *payload, size_t payload_size, FILE *out
 
     tag_db *signature_tag_db = NULL;
     off_t pad;
+
+    MD5_CTX md5_ctx;
+    unsigned char md5sum[MD5_DIGEST_LENGTH];
+
     int retval = -1;
 
     /* Construct a NEVRA for the rpmlead */
@@ -311,7 +317,25 @@ int output_rpm(tag_db *tags, const void *payload, size_t payload_size, FILE *out
         goto cleanup;
     }
 
-    /* XXX RPMSIGTAG_MD5 */
+    /* Generate the checksum for RPMSIGTAG_MD5 */
+    if (!MD5_Init(&md5_ctx)) {
+        fprintf(stderr, "Unable to initialize MD5 context\n");
+        goto cleanup;
+    }
+
+    if (!MD5_Update(&md5_ctx, header_buffer, header_size) || !MD5_Update(&md5_ctx, payload, payload_size)) {
+        fprintf(stderr, "Error updating header checksum\n");
+        goto cleanup;
+    }
+
+    if (!MD5_Final(md5sum, &md5_ctx)) {
+        fprintf(stderr, "Error finalizing header checksum\n");
+        goto cleanup;
+    }
+
+    if (add_tag(signature_tag_db, RPMSIGTAG_MD5, md5sum, MD5_DIGEST_LENGTH) != 0) {
+        goto cleanup;
+    }
 
     /* Construct the signature header and output it */
     if (construct_header(signature_tag_db, &signature_header_buffer, &signature_header_size, rpm_sig_tag_get_type) != 0) {
