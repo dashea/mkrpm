@@ -210,6 +210,7 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
     char gid_buf[12] = { 0 };
 
     uint32_t u32_buf;
+    uint16_t u16_buf;
 
     if (sbuf->st_size > UINT32_MAX) {
         fprintf(stderr, "File %s is too large to be stored\n", path);
@@ -221,13 +222,13 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
         return -1;
     }
 
-    u32_buf = htobe32((uint32_t) sbuf->st_mode);
-    if (add_tag(db, RPMTAG_FILEMODES, &u32_buf, sizeof(u32_buf)) != 0) {
+    u16_buf = htobe16((uint16_t) sbuf->st_mode);
+    if (add_tag(db, RPMTAG_FILEMODES, &u16_buf, sizeof(u16_buf)) != 0) {
         return -1;
     }
 
-    u32_buf = htobe32((uint32_t) sbuf->st_rdev);
-    if (add_tag(db, RPMTAG_FILERDEVS, &u32_buf, sizeof(u32_buf)) != 0) {
+    u16_buf = htobe16((uint16_t) sbuf->st_rdev);
+    if (add_tag(db, RPMTAG_FILERDEVS, &u16_buf, sizeof(u16_buf)) != 0) {
         return -1;
     }
 
