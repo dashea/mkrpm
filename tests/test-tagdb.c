@@ -118,6 +118,7 @@ static void test_rpm_tag_get_type(void **state) {
     assert_int_equal(rpm_tag_get_type(RPMTAG_FILELANGS),     RPM_STRING_ARRAY_TYPE);
     assert_int_equal(rpm_tag_get_type(RPMTAG_PROVIDEFLAGS),  RPM_INT32_TYPE);
     assert_int_equal(rpm_tag_get_type(RPMTAG_PROVIDEVERSION),RPM_STRING_ARRAY_TYPE);
+    assert_int_equal(rpm_tag_get_type(RPMTAG_OLDFILENAMES),  RPM_STRING_ARRAY_TYPE);
     assert_int_equal(rpm_tag_get_type(RPMTAG_DIRINDEXES),    RPM_INT32_TYPE);
     assert_int_equal(rpm_tag_get_type(RPMTAG_BASENAMES),     RPM_STRING_ARRAY_TYPE);
     assert_int_equal(rpm_tag_get_type(RPMTAG_DIRNAMES),      RPM_STRING_ARRAY_TYPE);
