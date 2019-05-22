@@ -30,4 +30,5 @@ Makefile.in
 /test-driver
 /tests/*.log
 /tests/*.trs
+/tests/test-metadata
 /tests/test-tagdb
