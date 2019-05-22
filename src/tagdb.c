@@ -202,7 +202,7 @@ int add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
     return 0;
 }
 
-int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const char *link_target) {
+int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const char *link_target, const char *checksum) {
     struct passwd *pwd;
     char uid_buf[12] = { 0 };
 
@@ -241,7 +241,9 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
         return -1;
     }
 
-    /* XXX RPMTAG_FILEMD5S */
+    if (add_tag(db, RPMTAG_FILEMD5S, checksum, strlen(checksum) + 1) != 0) {
+        return -1;
+    }
 
     if (add_tag(db, RPMTAG_FILELINKTOS, link_target, strlen(link_target) + 1) != 0) {
         return -1;

@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -30,6 +31,8 @@
 
 #include <archive.h>
 #include <archive_entry.h>
+
+#include <openssl/md5.h>
 
 #include "payload_cpio.h"
 #include "tagdb.h"
@@ -88,6 +91,12 @@ static int add_payload_entry(struct archive *archive, struct archive_entry *entr
     int fd;
     char buffer[BUFSIZ];
     ssize_t bytes_read;
+    bool write_payload = true;
+
+    MD5_CTX md5_ctx;
+    unsigned char md5sum[MD5_DIGEST_LENGTH];
+    char md5_ascii[(MD5_DIGEST_LENGTH * 2) + 1];
+    int i;
 
     assert(archive != NULL);
     assert(entry != NULL);
@@ -98,6 +107,61 @@ static int add_payload_entry(struct archive *archive, struct archive_entry *entr
     }
 
     sourcepath = archive_entry_sourcepath(entry);
+
+    if (archive_entry_filetype(entry) == AE_IFREG) {
+        /* If the entry's size is 0, do not write a cpio payload; this may be a placeholder entry
+         * from the hardlink resolver. However, we still need the md5sum for the file, so read the
+         * data anyway.
+         */
+        if (archive_entry_size(entry) == 0) {
+            write_payload = false;
+        }
+
+        if (!MD5_Init(&md5_ctx)) {
+            fprintf(stderr, "Unable to initialize MD5 context\n");
+            return -1;
+        }
+
+        fd = open(sourcepath, O_RDONLY);
+
+        if (fd == -1) {
+            fprintf(stderr, "Unable to open %s: %s\n", sourcepath, strerror(errno));
+            return -1;
+        }
+
+        while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+            if (write_payload && (archive_write_data(archive, buffer, (size_t) bytes_read) < 0)) {
+                fprintf(stderr, "Unable to write data for %s to archive: %s\n", sourcepath, archive_error_string(archive));
+                close(fd);
+                return -1;
+            }
+
+            if (!MD5_Update(&md5_ctx, buffer, (unsigned long) bytes_read)) {
+                fprintf(stderr, "Error updating checksum for %s\n", sourcepath);
+                close(fd);
+                return -1;
+            }
+        }
+
+        if (bytes_read < 0) {
+            fprintf(stderr, "Error reading from %s: %s\n", sourcepath, strerror(errno));
+            close(fd);
+            return -1;
+        }
+
+        close(fd);
+
+        if (!MD5_Final(md5sum, &md5_ctx)) {
+            fprintf(stderr, "Error finalizing checksum for %s\n", sourcepath);
+            return -1;
+        }
+
+        for (i = 0; i < sizeof(md5sum); i++) {
+            snprintf(md5_ascii + (i * 2), 3, "%02x", md5sum[i]);
+        }
+    } else {
+        md5_ascii[0] = '\0';
+    }
 
     /*
      * Add the metadata to the RPM header.
@@ -121,34 +185,10 @@ static int add_payload_entry(struct archive *archive, struct archive_entry *entr
         link_target = "";
     }
 
-    if (add_file_tags(tags, sourcepath, sbuf, link_target) != 0) {
+    if (add_file_tags(tags, sourcepath, sbuf, link_target, md5_ascii) != 0) {
         return -1;
     }
 
-    if ((archive_entry_filetype(entry) == AE_IFREG) && (archive_entry_size(entry) > 0)) {
-        fd = open(sourcepath, O_RDONLY);
-
-        if (fd == -1) {
-            fprintf(stderr, "Unable to open %s: %s\n", sourcepath, strerror(errno));
-            return -1;
-        }
-
-        while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
-            if (archive_write_data(archive, buffer, (size_t) bytes_read) < 0) {
-                fprintf(stderr, "Unable to write data for %s to archive: %s\n", sourcepath, archive_error_string(archive));
-                close(fd);
-                return -1;
-            }
-        }
-
-        if (bytes_read < 0) {
-            fprintf(stderr, "Error reading from %s: %s\n", sourcepath, strerror(errno));
-            close(fd);
-            return -1;
-        }
-
-        close(fd);
-    }
 
     return 0;
 }
