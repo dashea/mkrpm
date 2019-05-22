@@ -130,6 +130,7 @@ typedef enum rpmTag {
     RPMTAG_GROUP             = 1016,    /* string */
     RPMTAG_OS                = 1021,    /* string */
     RPMTAG_ARCH              = 1022,    /* string */
+    RPMTAG_OLDFILENAMES      = 1027,    /* string array */
     RPMTAG_FILESIZES         = 1028,    /* int32 array */
     RPMTAG_FILEMODES         = 1030,    /* int16 array */
     RPMTAG_FILERDEVS         = 1033,    /* int16 array */

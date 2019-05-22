@@ -106,6 +106,7 @@ rpmTagType rpm_tag_get_type(int tag) {
         case RPMTAG_REQUIRENAME:
         case RPMTAG_REQUIREVERSION:
         case RPMTAG_PROVIDEVERSION:
+        case RPMTAG_OLDFILENAMES:
         case RPMTAG_BASENAMES:
         case RPMTAG_DIRNAMES:
             return RPM_STRING_ARRAY_TYPE;
@@ -295,8 +296,9 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
         return -1;
     }
 
-    /* XXX DIRINDEXES/BASENAMES/DIRNAMES */
-    /* Need a new object to keep track of which directories are already added */
+    if (add_tag(db, RPMTAG_OLDFILENAMES, path, strlen(path) + 1) != 0) {
+        return -1;
+    }
 
     return 0;
 }

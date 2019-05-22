@@ -126,10 +126,6 @@ int main(int argc, char **argv) {
     char *compression = "gzip";
     char *payload_flags = "9";
 
-    const char *compressed_filenames_requires = "rpmlib(CompresedFileNames)";
-    const char *compressed_filenames_version = "3.0.4-1";
-    uint32_t require_flags;
-
     int i;
 
     if (argc < 2) {
@@ -172,14 +168,6 @@ int main(int argc, char **argv) {
             (add_tag(tags, RPMTAG_PAYLOADCOMPRESSOR, compression, strlen(compression) + 1) != 0) ||
             (add_tag(tags, RPMTAG_PAYLOADFORMAT, payload_flags, strlen(payload_flags) + 1) != 0) ||
             (add_tag(tags, RPMTAG_HEADERI18NTABLE, "C", 2) != 0)) {
-        exit(EXIT_FAILURE);
-    }
-
-    /* Add the necessary rpmlib requirements */
-    require_flags = RPMSENSE_LESS | RPMSENSE_EQUAL | RPMSENSE_RPMLIB;
-    if ((add_tag(tags, RPMTAG_REQUIRENAME, compressed_filenames_requires, strlen(compressed_filenames_requires) + 1) != 0) ||
-            (add_tag(tags, RPMTAG_REQUIREFLAGS, &require_flags, sizeof(require_flags)) != 0) ||
-            (add_tag(tags, RPMTAG_REQUIREVERSION, compressed_filenames_version, strlen(compressed_filenames_version) + 1) != 0)) {
         exit(EXIT_FAILURE);
     }
 
