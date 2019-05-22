@@ -206,13 +206,16 @@ cleanup:
 int finish_archive(struct archive *archive, struct archive_entry_linkresolver *resolver) {
     struct archive_entry *entry;
 
+    /* Unused, but the argument to archive_entry_linkify must be non-NULL */
+    struct archive_entry *sparse;
+
     assert(archive != NULL);
     assert(resolver != NULL);
 
     /* Flush any queued entries */
     do {
         entry = NULL;
-        archive_entry_linkify(resolver, &entry, NULL);
+        archive_entry_linkify(resolver, &entry, &sparse);
 
         if (entry != NULL) {
             if (add_payload_entry(archive, entry) != 0) {
