@@ -67,7 +67,4 @@ rpmTagType rpm_sig_tag_get_type(int);
 /* Add a tag to the db */
 int add_tag(tag_db *, rpmTag, const void *, size_t);
 
-/* Add all of the tags for the given file */
-int add_file_tags(tag_db *, const char *, const struct stat *, const char *, const char *);
-
 #endif

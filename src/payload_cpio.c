@@ -34,6 +34,7 @@
 
 #include <openssl/md5.h>
 
+#include "metadata.h"
 #include "payload_cpio.h"
 #include "tagdb.h"
 

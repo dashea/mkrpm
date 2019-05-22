@@ -5,6 +5,8 @@ bin_PROGRAMS = mkrpm
 noinst_LTLIBRARIES = libmkrpm.la
 
 libmkrpm_la_SOURCES = rpmtypes.h \
+		      metadata.c \
+		      metadata.h \
 		      output.c \
 		      output.h \
 		      payload_cpio.c \
