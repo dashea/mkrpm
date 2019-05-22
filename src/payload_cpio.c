@@ -93,7 +93,7 @@ int add_payload_entry(struct archive *archive, struct archive_entry *entry) {
         return -1;
     }
 
-    if (archive_entry_filetype(entry) == AE_IFREG) {
+    if ((archive_entry_filetype(entry) == AE_IFREG) && (archive_entry_size(entry) > 0)) {
         sourcepath = archive_entry_sourcepath(entry);
         fd = open(sourcepath, O_RDONLY);
 
