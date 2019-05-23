@@ -27,6 +27,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -35,6 +36,8 @@
 #include <setjmp.h>
 #include <stdint.h>
 #include <cmocka.h>
+
+#define EMPTY_MD5SUM    "d41d8cd98f00b204e9800998ecf8427e"
 
 /* Wrappers for getpwuid and getgrgid, so we can fake user/group names predictably */
 struct passwd * __wrap_getpwuid(uid_t uid) {
@@ -72,10 +75,8 @@ struct group * __wrap_getgrgid(gid_t gid) {
 }
 
 /* Override add_tag. This just ensures that add_tag was called with the expected arguments */
-#include <stdio.h>
 int __wrap_add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
     int retval;
-    fprintf(stderr, "WRAPPED\n");
     check_expected(tag);
     check_expected(data);
     check_expected(data_size);
@@ -101,7 +102,7 @@ static void test_add_file_tags_simple(void **state) {
     uint32_t zero = 0;
 
     tags = init_tag_db();
-    assert(tags != NULL);
+    assert_non_null(tags);
 
     /* host byte order */
     sbuf.st_dev = 0xFD04;
@@ -150,8 +151,8 @@ static void test_add_file_tags_simple(void **state) {
     will_return(__wrap_add_tag, 0);
 
     expect_value(__wrap_add_tag, tag, RPMTAG_FILEMD5S);
-    expect_string(__wrap_add_tag, data, "d41d8cd98f00b204e9800998ecf8427e");
-    expect_value(__wrap_add_tag, data_size, 33);
+    expect_string(__wrap_add_tag, data, EMPTY_MD5SUM);
+    expect_value(__wrap_add_tag, data_size, strlen(EMPTY_MD5SUM) + 1);
     will_return(__wrap_add_tag, 0);
 
     expect_value(__wrap_add_tag, tag, RPMTAG_FILELINKTOS);
@@ -194,7 +195,108 @@ static void test_add_file_tags_simple(void **state) {
     expect_value(__wrap_add_tag, data_size, 10);
     will_return(__wrap_add_tag, 0);
 
-    assert_int_equal(add_file_tags(tags, "/whatever", &sbuf, "", "d41d8cd98f00b204e9800998ecf8427e"), 0);
+    assert_int_equal(add_file_tags(tags, "/whatever", &sbuf, "", EMPTY_MD5SUM), 0);
+
+    free_tag_db(tags);
+}
+
+static void test_add_file_tags_big_values(void **state) {
+    struct stat sbuf;
+    tag_db *tags;
+
+    tags = init_tag_db();
+    assert_non_null(tags);
+
+    /* size > UINT32_MAX */
+    memset(&sbuf, 0, sizeof(sbuf));
+    sbuf.st_size = 0x100000000LL;
+    assert_int_equal(add_file_tags(tags, "/whatever", &sbuf, "", ""), -1);
+
+    /* mtime > UINT32_MAX */
+    memset(&sbuf, 0, sizeof(sbuf));
+    sbuf.st_mtime = 0x100000000LL;
+    assert_int_equal(add_file_tags(tags, "/whatever", &sbuf, "", ""), -1);
+
+    free_tag_db(tags);
+}
+
+static void test_add_file_tags_no_user_group(void **state) {
+    struct stat sbuf;
+    tag_db *tags;
+
+    tags = init_tag_db();
+    assert_non_null(tags);
+
+    memset(&sbuf, 0, sizeof(sbuf));
+    sbuf.st_mode = S_IFREG;
+    sbuf.st_uid = 1000;
+    sbuf.st_gid = 2000;
+
+    /* Return NULL for the UID and GID lookups */
+    expect_value(__wrap_getpwuid, uid, sbuf.st_uid);
+    will_return(__wrap_getpwuid, NULL);
+
+    expect_value(__wrap_getgrgid, gid, sbuf.st_gid);
+    will_return(__wrap_getgrgid, NULL);
+
+    /* Add the expected calls to add_tag */
+    /* FILESIZES, FILEMODES, FILERDEVS, FILEMTIMES, FILEMD5S, FILELINKTOS, FILEFLAGS */
+    expect_any_count(__wrap_add_tag, tag, 7);
+    expect_any_count(__wrap_add_tag, data, 7);
+    expect_any_count(__wrap_add_tag, data_size, 7);
+    will_return_count(__wrap_add_tag, 0, 7);
+
+    expect_value(__wrap_add_tag, tag, RPMTAG_FILEUSERNAME);
+    expect_string(__wrap_add_tag, data, "1000");
+    expect_value(__wrap_add_tag, data_size, 5);
+    will_return(__wrap_add_tag, 0);
+
+    expect_value(__wrap_add_tag, tag, RPMTAG_FILEGROUPNAME);
+    expect_string(__wrap_add_tag, data, "2000");
+    expect_value(__wrap_add_tag, data_size, 5);
+    will_return(__wrap_add_tag, 0);
+
+    /* FILEDEVICES, FILEINODES, FILELANGS, OLDFILENAMES */
+    expect_any_count(__wrap_add_tag, tag, 4);
+    expect_any_count(__wrap_add_tag, data, 4);
+    expect_any_count(__wrap_add_tag, data_size, 4);
+    will_return_count(__wrap_add_tag, 0, 4);
+
+    assert_int_equal(add_file_tags(tags, "/whatever", &sbuf, "", ""), 0);
+
+    free_tag_db(tags);
+}
+
+static void test_add_file_tags_add_tag_failures(void **state) {
+    struct stat sbuf;
+    tag_db *tags;
+    int i;
+
+    tags = init_tag_db();
+    assert_non_null(tags);
+
+    memset(&sbuf, 0, sizeof(sbuf));
+
+    /* Ignore inputs, always return NULL for the uid/gid lookups. */
+    expect_any_always(__wrap_getpwuid, uid);
+    expect_any_always(__wrap_getgrgid, gid);
+    will_return_always(__wrap_getpwuid, NULL);
+    will_return_always(__wrap_getgrgid, NULL);
+
+    expect_any_always(__wrap_add_tag, tag);
+    expect_any_always(__wrap_add_tag, data);
+    expect_any_always(__wrap_add_tag, data_size);
+
+    /* check each of the 13 add_tag calls, make sure failure on any of them causes add_file_tags to fail and stop calling add_tag */
+    for (i = 0; i < 13; i++) {
+        if (i > 0) {
+            will_return_count(__wrap_add_tag, 0, i);
+        }
+
+        will_return(__wrap_add_tag, -1);
+
+        assert_int_equal(add_file_tags(tags, "/whatever", &sbuf, "", ""), -1);
+    }
 
     free_tag_db(tags);
 }
@@ -202,6 +304,9 @@ static void test_add_file_tags_simple(void **state) {
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_add_file_tags_simple),
+        cmocka_unit_test(test_add_file_tags_big_values),
+        cmocka_unit_test(test_add_file_tags_no_user_group),
+        cmocka_unit_test(test_add_file_tags_add_tag_failures),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
