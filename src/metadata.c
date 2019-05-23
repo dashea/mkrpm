@@ -44,6 +44,11 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
         return -1;
     }
 
+    if (sbuf->st_mtime > UINT32_MAX) {
+        fprintf(stderr, "%s: RPM is not Y2K38 compliant\n", path);
+        return -1;
+    }
+
     u32_buf = htobe32((uint32_t) sbuf->st_size);
     if (add_tag(db, RPMTAG_FILESIZES, &u32_buf, sizeof(u32_buf)) != 0) {
         return -1;
@@ -56,11 +61,6 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
 
     u16_buf = htobe16((uint16_t) sbuf->st_rdev);
     if (add_tag(db, RPMTAG_FILERDEVS, &u16_buf, sizeof(u16_buf)) != 0) {
-        return -1;
-    }
-
-    if (sbuf->st_mtime > UINT32_MAX) {
-        fprintf(stderr, "%s: RPM is not Y2K38 compliant\n", path);
         return -1;
     }
 
