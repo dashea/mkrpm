@@ -75,6 +75,7 @@ struct group * __wrap_getgrgid(gid_t gid) {
 }
 
 /* Override add_tag. This just ensures that add_tag was called with the expected arguments */
+extern int __real_add_tag(tag_db *, rpmTag, const void *, size_t);
 int __wrap_add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
     int retval;
     check_expected(tag);
@@ -130,6 +131,11 @@ static void test_add_file_tags_simple(void **state) {
     will_return(__wrap_getgrgid, "test-group");
 
     /* Queue up the value for the expected calls to add_tag */
+    expect_value(__wrap_add_tag, tag, RPMTAG_SIZE);
+    expect_memory(__wrap_add_tag, data, &size, 4);
+    expect_value(__wrap_add_tag, data_size, 4);
+    will_return(__wrap_add_tag, 0);
+
     expect_value(__wrap_add_tag, tag, RPMTAG_FILESIZES);
     expect_memory(__wrap_add_tag, data, &size, 4);
     expect_value(__wrap_add_tag, data_size, 4);
@@ -203,6 +209,7 @@ static void test_add_file_tags_simple(void **state) {
 static void test_add_file_tags_big_values(void **state) {
     struct stat sbuf;
     tag_db *tags;
+    uint32_t u32_buf;
 
     tags = init_tag_db();
     assert_non_null(tags);
@@ -216,6 +223,51 @@ static void test_add_file_tags_big_values(void **state) {
     memset(&sbuf, 0, sizeof(sbuf));
     sbuf.st_mtime = 0x100000000LL;
     assert_int_equal(add_file_tags(tags, "/whatever", &sbuf, "", ""), -1);
+
+    /* combined size (RPMTAG_SIZE) > UINT32_MAX */
+    /* Start with UINT32_MAX already in RPMTAG_SIZE */
+    u32_buf = 0xFFFFFFFF;
+    assert_int_equal(__real_add_tag(tags, RPMTAG_SIZE, &u32_buf, 4), 0);
+
+    memset(&sbuf, 0, sizeof(sbuf));
+    sbuf.st_size = 1;
+    assert_int_equal(add_file_tags(tags, "/whoever", &sbuf, "", ""), -1);
+
+    free_tag_db(tags);
+}
+
+static void test_add_file_tags_combined_size(void **state) {
+    struct stat sbuf;
+    tag_db *tags;
+    uint32_t u32_buf;
+
+    tags = init_tag_db();
+    assert_non_null(tags);
+
+    /* Start with an initial size */
+    u32_buf = htobe32(420);
+    assert_int_equal(__real_add_tag(tags, RPMTAG_SIZE, &u32_buf, 4), 0);
+
+    /* Add a new size */
+    memset(&sbuf, 0, sizeof(sbuf));
+    sbuf.st_size = 69;
+
+    expect_any_always(__wrap_add_tag, tag);
+    expect_any_always(__wrap_add_tag, data);
+    expect_any_always(__wrap_add_tag, data_size);
+    will_return_always(__wrap_add_tag, 0);
+
+    expect_any_always(__wrap_getpwuid, uid);
+    will_return_always(__wrap_getpwuid, NULL);
+
+    expect_any_always(__wrap_getgrgid, gid);
+    will_return_always(__wrap_getgrgid, NULL);
+
+    assert_int_equal(add_file_tags(tags, "/whatever", &sbuf, "", ""), 0);
+
+    assert_non_null(tags->entries[RPMTAG_SIZE]);
+    assert_non_null(tags->entries[RPMTAG_SIZE]->data);
+    assert_int_equal(*((uint32_t *) tags->entries[RPMTAG_SIZE]->data), htobe32(420 + 69));
 
     free_tag_db(tags);
 }
@@ -240,11 +292,11 @@ static void test_add_file_tags_no_user_group(void **state) {
     will_return(__wrap_getgrgid, NULL);
 
     /* Add the expected calls to add_tag */
-    /* FILESIZES, FILEMODES, FILERDEVS, FILEMTIMES, FILEMD5S, FILELINKTOS, FILEFLAGS */
-    expect_any_count(__wrap_add_tag, tag, 7);
-    expect_any_count(__wrap_add_tag, data, 7);
-    expect_any_count(__wrap_add_tag, data_size, 7);
-    will_return_count(__wrap_add_tag, 0, 7);
+    /* SIZE, FILESIZES, FILEMODES, FILERDEVS, FILEMTIMES, FILEMD5S, FILELINKTOS, FILEFLAGS */
+    expect_any_count(__wrap_add_tag, tag, 8);
+    expect_any_count(__wrap_add_tag, data, 8);
+    expect_any_count(__wrap_add_tag, data_size, 8);
+    will_return_count(__wrap_add_tag, 0, 8);
 
     expect_value(__wrap_add_tag, tag, RPMTAG_FILEUSERNAME);
     expect_string(__wrap_add_tag, data, "1000");
@@ -287,8 +339,8 @@ static void test_add_file_tags_add_tag_failures(void **state) {
     expect_any_always(__wrap_add_tag, data);
     expect_any_always(__wrap_add_tag, data_size);
 
-    /* check each of the 13 add_tag calls, make sure failure on any of them causes add_file_tags to fail and stop calling add_tag */
-    for (i = 0; i < 13; i++) {
+    /* check each of the 14 add_tag calls, make sure failure on any of them causes add_file_tags to fail and stop calling add_tag */
+    for (i = 0; i < 14; i++) {
         if (i > 0) {
             will_return_count(__wrap_add_tag, 0, i);
         }
@@ -307,6 +359,7 @@ int main(void) {
         cmocka_unit_test(test_add_file_tags_big_values),
         cmocka_unit_test(test_add_file_tags_no_user_group),
         cmocka_unit_test(test_add_file_tags_add_tag_failures),
+        cmocka_unit_test(test_add_file_tags_combined_size),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

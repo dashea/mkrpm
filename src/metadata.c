@@ -41,6 +41,8 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
     uint32_t u32_buf;
     uint16_t u16_buf;
 
+    uint32_t file_sizes;
+
     if (sbuf->st_size > UINT32_MAX) {
         fprintf(stderr, "File %s is too large to be stored\n", path);
         return -1;
@@ -49,6 +51,26 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
     if (sbuf->st_mtime > UINT32_MAX) {
         fprintf(stderr, "%s: RPM is not Y2K38 compliant\n", path);
         return -1;
+    }
+
+    /* Add the size of this file to RPMTAG_SIZE. */
+    if (db->entries[RPMTAG_SIZE] == NULL) {
+        u32_buf = htobe32((uint32_t) sbuf->st_size);
+
+        if (add_tag(db, RPMTAG_SIZE, &u32_buf, sizeof(u32_buf)) != 0) {
+            return -1;
+        }
+    } else {
+        file_sizes = be32toh(*((uint32_t *) db->entries[RPMTAG_SIZE]->data));
+
+        if ((((size_t) file_sizes) + sbuf->st_size) > UINT32_MAX) {
+            fprintf(stderr, "Total file size is too large to be stored\n");
+            return -1;
+        }
+
+        file_sizes += (uint32_t) sbuf->st_size;
+        u32_buf = htobe32(file_sizes);
+        memcpy(db->entries[RPMTAG_SIZE]->data, &u32_buf, 4);
     }
 
     u32_buf = htobe32((uint32_t) sbuf->st_size);
