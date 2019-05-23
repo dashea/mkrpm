@@ -32,9 +32,11 @@
 int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const char *link_target, const char *checksum) {
     struct passwd *pwd;
     char uid_buf[12] = { 0 };
+    const char *user_name;
 
     struct group *grp;
     char gid_buf[12] = { 0 };
+    const char *group_name;
 
     uint32_t u32_buf;
     uint16_t u16_buf;
@@ -86,26 +88,24 @@ int add_file_tags(tag_db *db, const char *path, const struct stat *sbuf, const c
     /* If the uid/gid are not resolvable to names, convert the ID to a string */
     if ((pwd = getpwuid(sbuf->st_uid)) == NULL) {
         (void) snprintf(uid_buf, sizeof(uid_buf), "%u", (unsigned int) sbuf->st_uid);
-
-        if (add_tag(db, RPMTAG_FILEUSERNAME, uid_buf, strlen(uid_buf) + 1) != 0) {
-            return -1;
-        }
+        user_name = uid_buf;
     } else {
-        if (add_tag(db, RPMTAG_FILEUSERNAME, pwd->pw_name, strlen(pwd->pw_name) + 1) != 0) {
-            return -1;
-        }
+        user_name = pwd->pw_name;
+    }
+
+    if (add_tag(db, RPMTAG_FILEUSERNAME, user_name, strlen(user_name) + 1) != 0) {
+        return -1;
     }
 
     if ((grp = getgrgid(sbuf->st_gid)) == NULL) {
         (void) snprintf(gid_buf, sizeof(gid_buf), "%u", (unsigned int) sbuf->st_gid);
-
-        if (add_tag(db, RPMTAG_FILEGROUPNAME, gid_buf, strlen(gid_buf) + 1) != 0) {
-            return -1;
-        }
+        group_name = gid_buf;
     } else {
-        if (add_tag(db, RPMTAG_FILEGROUPNAME, grp->gr_name, strlen(grp->gr_name) + 1) != 0) {
-            return -1;
-        }
+        group_name = grp->gr_name;
+    }
+
+    if (add_tag(db, RPMTAG_FILEGROUPNAME, group_name, strlen(group_name) + 1) != 0) {
+        return -1;
     }
 
     u32_buf = htobe32((uint32_t) sbuf->st_dev);
