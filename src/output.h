@@ -23,6 +23,13 @@
 #include <sys/types.h>
 #include "tagdb.h"
 
+int output_lead(FILE *, const char *);
+
+typedef rpmTagType (*tag_type_func)(int);
+
+int construct_tag(int, struct tag_entry *, off_t, off_t, off_t *, tag_type_func, FILE *);
+off_t align_tag(rpmTagType, off_t);
+
 int output_rpm(tag_db *, const void *, size_t, FILE *);
 
 #endif

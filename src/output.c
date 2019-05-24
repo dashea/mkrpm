@@ -80,7 +80,29 @@ int output_lead(FILE *output, const char *nevra) {
     return 0;
 }
 
-typedef rpmTagType (*tag_type_func)(int);
+off_t align_tag(rpmTagType type, off_t offset) {
+    int align;
+
+    switch (type) {
+        case RPM_INT16_TYPE:
+            align = 2;
+            break;
+        case RPM_INT32_TYPE:
+            align = 4;
+            break;
+        case RPM_INT64_TYPE:
+            align = 8;
+            break;
+        default:
+            align = 1;
+    }
+
+    if ((offset % align) != 0) {
+        offset += align - (offset % align);
+    }
+
+    return offset;
+}
 
 int construct_tag(int tag, struct tag_entry *entry, off_t next_index, off_t data_start, off_t *data_used, tag_type_func f_tag_type, FILE *output) {
     rpmTagType type = f_tag_type(tag);
@@ -118,18 +140,7 @@ int construct_tag(int tag, struct tag_entry *entry, off_t next_index, off_t data
     }
 
     /* Offset into the data blob. Just start at the end of what's written, plus any padding needed for alignment */
-    if ((type == RPM_INT16_TYPE) && ((data_offset % 2) != 0)) {
-        data_offset++;
-    }
-
-    if ((type == RPM_INT32_TYPE) && ((data_offset % 4) != 0)) {
-        data_offset += 4 - (data_offset % 4);
-    }
-
-    if ((type == RPM_INT64_TYPE) && ((data_offset % 8) != 0)) {
-        data_offset += 8 - (data_offset % 8);
-    }
-
+    data_offset = align_tag(type, data_offset);
     u32_buf = htobe32((uint32_t) data_offset);
     if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
         fprintf(stderr, "Unable to write tag offset: %s\n", strerror(errno));

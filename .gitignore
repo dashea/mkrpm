@@ -31,4 +31,5 @@ Makefile.in
 /tests/*.log
 /tests/*.trs
 /tests/test-metadata
+/tests/test-output
 /tests/test-tagdb

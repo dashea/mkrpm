@@ -1,6 +1,7 @@
 @VALGRIND_CHECK_RULES@
 
 TESTS = test-metadata \
+	test-output \
 	test-tagdb
 
 check_PROGRAMS = $(TESTS)
@@ -13,3 +14,6 @@ test_tagdb_LDFLAGS = -Wl,--wrap=abort -Wl,--wrap=calloc -Wl,--wrap=realloc
 
 test_metadata_SOURCES = test-metadata.c
 test_metadata_LDFLAGS = -Wl,--wrap=getpwuid -Wl,--wrap=getgrgid -Wl,--wrap=add_tag
+
+test_output_SOURCES = test-output.c
+test_output_LDFLAGS = -Wl,--wrap=fwrite -Wl,--wrap=fseeko
