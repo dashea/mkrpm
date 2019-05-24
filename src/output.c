@@ -155,8 +155,9 @@ int construct_header(tag_db *tags, char **output_buffer, size_t *output_size, ta
     buffer_size = 16;
     SLIST_FOREACH(tag_entry, &tags->tags_used, items) {
         tag_count++;
-        buffer_size += 16 + tags->entries[tag_entry->tag]->data_used;
-        buffer_size = align_tag(tag_entry->tag, buffer_size);
+        buffer_size += 16;
+        buffer_size += tags->entries[tag_entry->tag]->data_used;
+        buffer_size = align_tag(f_tag_type(tag_entry->tag), buffer_size);
     }
 
     /* Allocate the buffer */
