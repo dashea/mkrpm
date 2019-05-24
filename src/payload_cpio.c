@@ -97,7 +97,7 @@ static int add_payload_entry(struct archive *archive, struct archive_entry *entr
     MD5_CTX md5_ctx;
     unsigned char md5sum[MD5_DIGEST_LENGTH];
     char md5_ascii[(MD5_DIGEST_LENGTH * 2) + 1];
-    int i;
+    unsigned int i;
 
     assert(archive != NULL);
     assert(entry != NULL);

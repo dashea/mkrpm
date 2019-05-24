@@ -76,8 +76,9 @@ struct group * __wrap_getgrgid(gid_t gid) {
 
 /* Override add_tag. This just ensures that add_tag was called with the expected arguments */
 extern int __real_add_tag(tag_db *, rpmTag, const void *, size_t);
-int __wrap_add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
+int __wrap_add_tag(__attribute__((unused)) tag_db *db, rpmTag tag, const void *data, size_t data_size) {
     int retval;
+
     check_expected(tag);
     check_expected(data);
     check_expected(data_size);
@@ -86,7 +87,7 @@ int __wrap_add_tag(tag_db *db, rpmTag tag, const void *data, size_t data_size) {
     return retval;
 }
 
-static void test_add_file_tags_simple(void **state) {
+static void test_add_file_tags_simple(__attribute__((unused)) void **state) {
     struct stat sbuf;
     tag_db *tags;
 
@@ -206,7 +207,7 @@ static void test_add_file_tags_simple(void **state) {
     free_tag_db(tags);
 }
 
-static void test_add_file_tags_big_values(void **state) {
+static void test_add_file_tags_big_values(__attribute__((unused)) void **state) {
     struct stat sbuf;
     tag_db *tags;
     uint32_t u32_buf;
@@ -236,7 +237,7 @@ static void test_add_file_tags_big_values(void **state) {
     free_tag_db(tags);
 }
 
-static void test_add_file_tags_combined_size(void **state) {
+static void test_add_file_tags_combined_size(__attribute__((unused)) void **state) {
     struct stat sbuf;
     tag_db *tags;
     uint32_t u32_buf;
@@ -272,7 +273,7 @@ static void test_add_file_tags_combined_size(void **state) {
     free_tag_db(tags);
 }
 
-static void test_add_file_tags_no_user_group(void **state) {
+static void test_add_file_tags_no_user_group(__attribute__((unused)) void **state) {
     struct stat sbuf;
     tag_db *tags;
 
@@ -319,7 +320,7 @@ static void test_add_file_tags_no_user_group(void **state) {
     free_tag_db(tags);
 }
 
-static void test_add_file_tags_add_tag_failures(void **state) {
+static void test_add_file_tags_add_tag_failures(__attribute((unused)) void **state) {
     struct stat sbuf;
     tag_db *tags;
     int i;

@@ -69,7 +69,7 @@ void * __wrap_realloc(void *ptr, size_t size) {
     return NULL;
 }
 
-static void test_init_tag_db(void **state) {
+static void test_init_tag_db(__attribute__((unused)) void **state) {
     tag_db *db;
 
     will_return(__wrap_calloc, 1);
@@ -82,12 +82,12 @@ static void test_init_tag_db(void **state) {
     assert_null(db);
 }
 
-static void test_free_tag_db(void **state) {
+static void test_free_tag_db(__attribute__((unused)) void **state) {
     /* Ensure freeing NULL doesn't bomb out */
     free_tag_db(NULL);
 }
 
-static void test_rpm_tag_get_type(void **state) {
+static void test_rpm_tag_get_type(__attribute__((unused)) void **state) {
     jmp_buf env;
 
     assert_int_equal(rpm_tag_get_type(RPMTAG_NAME),          RPM_STRING_TYPE);
@@ -133,7 +133,7 @@ static void test_rpm_tag_get_type(void **state) {
     }
 }
 
-static void test_rpm_sig_tag_get_type(void **state) {
+static void test_rpm_sig_tag_get_type(__attribute__((unused)) void **state) {
     jmp_buf env;
 
     assert_int_equal(rpm_sig_tag_get_type(RPMSIGTAG_SIZE), RPM_INT32_TYPE);
@@ -146,7 +146,7 @@ static void test_rpm_sig_tag_get_type(void **state) {
     }
 }
 
-static void test_add_tag_simple(void **state) {
+static void test_add_tag_simple(__attribute__((unused)) void **state) {
     tag_db *db;
     uint32_t val = 47;
     tag_list_entry *list_entry;
@@ -183,7 +183,7 @@ static void test_add_tag_simple(void **state) {
     free_tag_db(db);
 }
 
-static void test_add_tag_array(void **state) {
+static void test_add_tag_array(__attribute__((unused)) void **state) {
     tag_db *db;
     uint32_t val1 = 47;
     uint32_t val2 = 48;
@@ -223,7 +223,7 @@ static void test_add_tag_array(void **state) {
     free_tag_db(db);
 }
 
-static void test_add_tag_multiple(void **state) {
+static void test_add_tag_multiple(__attribute__((unused)) void **state) {
     tag_db *db;
     uint32_t val1 = 47;
     uint32_t val2 = 48;
@@ -278,7 +278,7 @@ static void test_add_tag_multiple(void **state) {
     free_tag_db(db);
 }
 
-static void test_add_tag_malloc_errors(void **state) {
+static void test_add_tag_malloc_errors(__attribute__((unused)) void **state) {
     tag_db *db;
     uint32_t val = 47;
 

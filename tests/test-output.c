@@ -53,7 +53,7 @@ size_t __wrap_fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
     return mock_type(size_t);
 }
 
-static void test_output_lead(void **state) {
+static void test_output_lead(__attribute__((unused)) void **state) {
     char rpmlead_buf[96];
     const char *nevra = "testy-1.0-1.x86_64";
 
@@ -186,7 +186,7 @@ static void test_output_lead(void **state) {
     assert_int_equal(output_lead(WRAP_OUTPUT, nevra), -1);
 }
 
-static void test_align_tag(void **state) {
+static void test_align_tag(__attribute__((unused)) void **state) {
     assert_int_equal(align_tag(RPM_INT16_TYPE, 45), 46);
     assert_int_equal(align_tag(RPM_INT16_TYPE, 46), 46);
     assert_int_equal(align_tag(RPM_INT32_TYPE, 46), 48);
@@ -196,7 +196,7 @@ static void test_align_tag(void **state) {
     assert_int_equal(align_tag(RPM_STRING_ARRAY_TYPE, 45), 45);
 }
 
-static void test_construct_tag_header(void **state) {
+static void test_construct_tag_header(__attribute__((unused)) void **state) {
     uint32_t u32_buf;
     uint32_t offset = 48;
     uint32_t count = 1;
@@ -225,7 +225,7 @@ static void test_construct_tag_header(void **state) {
     assert_memory_equal(output_buffer, expected_buffer, sizeof(expected_buffer));
 }
 
-void test_construct_header(void **state) {
+static void test_construct_header(__attribute__((unused)) void **state) {
     tag_db *tags;
     char *output_buffer;
     size_t output_size;
@@ -288,7 +288,7 @@ void test_construct_header(void **state) {
     free_tag_db(tags);
 }
 
-void test_construct_header_bin(void **state) {
+static void test_construct_header_bin(__attribute__((unused)) void **state) {
     /* Ensure the count is correctly adjusted for RPM_BIN_TYPE */
 
     tag_db *tags;
