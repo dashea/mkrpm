@@ -18,6 +18,7 @@
 
 #include "config.h"
 
+#include <assert.h>
 #include <endian.h>
 #include <errno.h>
 #include <stdint.h>
@@ -104,172 +105,115 @@ off_t align_tag(rpmTagType type, off_t offset) {
     return offset;
 }
 
-int construct_tag(int tag, struct tag_entry *entry, off_t next_index, off_t data_start, off_t *data_used, tag_type_func f_tag_type, FILE *output) {
-    rpmTagType type = f_tag_type(tag);
-    uint32_t count;
+void construct_tag_header(int tag, rpmTagType type, uint32_t data_offset, uint32_t count, char *output) {
     uint32_t u32_buf;
-    off_t data_offset = *data_used;
-
-    /* In the case of RPM_BIN_TYPE, the count member of the tag entry is not the count we need to output.
-     * The count to output in this case is the number of bytes in the entry.
-     */
-    if (type == RPM_BIN_TYPE) {
-        count = (uint32_t) entry->data_used;
-    } else {
-        count = entry->count;
-    }
-
-    /* Seek to the position of the next index header slot */
-    if (fseeko(output, next_index, SEEK_SET) != 0) {
-        fprintf(stderr, "Unable to seek to tag index position: %s\n", strerror(errno));
-        return -1;
-    }
 
     /* Tag ID */
     u32_buf = htobe32(tag);
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to write tag ID: %s\n", strerror(errno));
-        return -1;
-    }
+    memcpy(output, &u32_buf, sizeof(u32_buf));
 
     /* Tag type */
     u32_buf = htobe32(type);
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to write tag type: %s\n", strerror(errno));
-        return -1;
-    }
+    memcpy(output + 4, &u32_buf, sizeof(u32_buf));
 
-    /* Offset into the data blob. Just start at the end of what's written, plus any padding needed for alignment */
-    data_offset = align_tag(type, data_offset);
-    u32_buf = htobe32((uint32_t) data_offset);
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to write tag offset: %s\n", strerror(errno));
-        return -1;
-    }
+    /* Offset into the data blob */
+    u32_buf = htobe32(data_offset);
+    memcpy(output + 8, &u32_buf, sizeof(u32_buf));
 
     /* Number of items */
     u32_buf = htobe32(count);
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to write tag count: %s\n", strerror(errno));
-        return -1;
-    }
-
-    /* Seek to the data offset */
-    if (fseeko(output, data_start + data_offset, SEEK_SET) != 0) {
-        fprintf(stderr, "Unable to seek to data offset: %s\n", strerror(errno));
-        return -1;
-    }
-
-    /* Write the data */
-    if (fwrite(entry->data, 1, entry->data_used, output) != entry->data_used) {
-        fprintf(stderr, "Unable to write tag data: %s\n", strerror(errno));
-        return -1;
-    }
-
-    /* Update the data_used */
-    *data_used = data_offset + entry->data_used;
-
-    return 0;
+    memcpy(output + 12, &u32_buf, sizeof(u32_buf));
 }
 
 int construct_header(tag_db *tags, char **output_buffer, size_t *output_size, tag_type_func f_tag_type) {
     tag_list_entry *tag_entry;
     uint32_t tag_count;
-    FILE *output = NULL;
+
+    char *buffer = NULL;
+    size_t buffer_size;
 
     uint32_t u32_buf;
 
-    off_t next_index;
-    off_t data_start;
-    off_t data_used;
+    struct tag_entry *entry;
+    rpmTagType type;
 
-    int retval = -1;
+    size_t next_index;
+    size_t data_start;
 
-    /* Use open_memstream to allocate the buffer */
-    if ((output = open_memstream(output_buffer, output_size)) == NULL) {
-        fprintf(stderr, "Unable to allocate output buffer: %s\n", strerror(errno));
-        goto cleanup;
-    }
+    uint32_t data_offset;
+    uint32_t count;
 
-    /* Count the tags */
+    assert(tags != NULL);
+    assert(output_buffer != NULL);
+    assert(*output_buffer != NULL);
+    assert(output_size != NULL);
+    assert(f_tag_type != NULL);
+
+    /* Count the tags and add up the sizes */
+    /* Start with a buffer size of 16 for the rpmheader struct */
     tag_count = 0;
+    buffer_size = 16;
     SLIST_FOREACH(tag_entry, &tags->tags_used, items) {
         tag_count++;
+        buffer_size += 16 + tags->entries[tag_entry->tag]->data_used;
+        buffer_size = align_tag(tag_entry->tag, buffer_size);
     }
+
+    /* Allocate the buffer */
+    if ((buffer = calloc(buffer_size, 1)) == NULL) {
+        fprintf(stderr, "Unable to allocate memory for header: %s\n", strerror(errno));
+        return -1;
+    }
+
+    *output_buffer = buffer;
+    *output_size = buffer_size;
 
     /* Output the header's header */
     /* Magic, 4 bytes */
     u32_buf = htobe32(RPMHEADER_MAGIC);
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to output header magic: %s\n", strerror(errno));
-        goto cleanup;
-    }
+    memcpy(buffer, &u32_buf, sizeof(u32_buf));
 
-    /* Reserved, 4 bytes, must 0's */
-    u32_buf = 0;
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to output header reserved area: %s\n", strerror(errno));
-        goto cleanup;
-    }
+    /* Reserved, 4 bytes, must 0's which calloc already took care of */
 
     /* number of header tags */
     u32_buf = htobe32(tag_count);
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to output header nindex: %s\n", strerror(errno));
-        goto cleanup;
-    }
+    memcpy(buffer + 8, &u32_buf, sizeof(u32_buf));
 
-    /* size of the data blob. Fill in with 0's for now, we'll come back to it once we know the actual size */
-    u32_buf = 0;
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to reserve space for hsize: %s\n", strerror(errno));
-        goto cleanup;
-    }
-
-    /* Allocate space for the index records. Each one is 32 bytes.
-     * Add another 32 bytes for the rpmheader data, so we have a value that can be used
-     * with SEEK_SET in construct_tag().
+    /* size of the data blob, which is the buffer size minus the rpmheader minus the index records
+     * both the rpmheader and index structs are 16 bytes each
      */
-    data_start = 32 * (tag_count + 1);
-    if (fseeko(output, data_start, SEEK_SET) != 0) {
-        fprintf(stderr, "Unable to reserve space for tag index records: %s\n", strerror(errno));
-        goto cleanup;
-    }
+    data_start = 16 * (tag_count + 1);
+    u32_buf = htobe32(buffer_size - data_start);
+    memcpy(buffer + 12, &u32_buf, sizeof(u32_buf));
 
-    /* Output the tags and tag data. The index data starts after the header header, which is also 32 bytes. */
-    next_index = 32;
-    data_used = 0;
+    /* Output the tags and tag data. The index data starts after the 16 byte rpmheader */
+    next_index = 16;
+    data_offset = 0;
+
     SLIST_FOREACH(tag_entry, &tags->tags_used, items) {
-        if (construct_tag(tag_entry->tag, tags->entries[tag_entry->tag], next_index, data_start, &data_used, f_tag_type, output) != 0) {
-            goto cleanup;
+        entry = tags->entries[tag_entry->tag];
+        type = f_tag_type(tag_entry->tag);
+
+        /* Align the start of the data */
+        data_offset = align_tag(type, data_offset);
+
+        /* For RPM_BIN_TYPE, count is the number of bytes, otherwise count is provided by the entry */
+        if (type == RPM_BIN_TYPE) {
+            count = entry->data_used;
+        } else {
+            count = entry->count;
         }
 
-        next_index += 32;
+        /* Write the index data */
+        construct_tag_header(tag_entry->tag, type, data_offset, count, buffer + next_index);
+        next_index += 16;
+
+        /* Write the data blog */
+        memcpy(buffer + data_start + data_offset, entry->data, entry->data_used);
+        data_offset += entry->data_used;
     }
 
-    /* Back up and write the data blob size */
-    if (fseeko(output, 12, SEEK_SET) != 0) {
-        fprintf(stderr, "Unable to seek to hblob position: %s\n", strerror(errno));
-        goto cleanup;
-    }
-
-    u32_buf = htobe32(data_used);
-    if (fwrite(&u32_buf, sizeof(u32_buf), 1, output) != 1) {
-        fprintf(stderr, "Unable to write header data size: %s\n", strerror(errno));
-        goto cleanup;
-    }
-
-    retval = 0;
-
-cleanup:
-    if (output != NULL) {
-        if ((fclose(output) != 0) && (retval == 0)) {
-            fprintf(stderr, "Unable to flush output while writing header: %s\n", strerror(errno));
-            retval = 1;
-        }
-    }
-
-    return retval;
+    return 0;
 }
 
 int output_rpm(tag_db *tags, const void *payload, size_t payload_size, FILE *output) {

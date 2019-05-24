@@ -24,6 +24,7 @@
 
 #include <endian.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <stdarg.h>
@@ -52,25 +53,8 @@ size_t __wrap_fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
     return mock_type(size_t);
 }
 
-/* Same thing for fseeko */
-extern int __real_fseeko(FILE *, off_t, int);
-int __wrap_fseeko(FILE *stream, off_t offset, int whence) {
-    if (stream != WRAP_OUTPUT) {
-        return __real_fseeko(stream, offset, whence);
-    }
-
-    check_expected(offset);
-    check_expected(whence);
-
-    return mock_type(int);
-}
-
-/* Fake rpmTagType functions */
-rpmTagType bin_type(int i) { return RPM_BIN_TYPE; }
-rpmTagType int32_type(int i) { return RPM_INT32_TYPE; }
-
 static void test_output_lead(void **state) {
-    unsigned char rpmlead_buf[96];
+    char rpmlead_buf[96];
     const char *nevra = "testy-1.0-1.x86_64";
 
     /* magic */
@@ -212,195 +196,156 @@ static void test_align_tag(void **state) {
     assert_int_equal(align_tag(RPM_STRING_ARRAY_TYPE, 45), 45);
 }
 
-static void test_construct_tag(void **state) {
-    struct tag_entry entry;
-    uint32_t tag_entry_data;
-
+static void test_construct_tag_header(void **state) {
     uint32_t u32_buf;
-    off_t next_index;
-    off_t data_start;
-    off_t data_used;
+    uint32_t offset = 48;
+    uint32_t count = 1;
+
+    char expected_buffer[16] = { 0 };
+    char output_buffer[16] = { 0 };
 
     /* Build a tag for RPMTAG_SIZE */
-    tag_entry_data = htobe32(420);
-    entry.count = 1;
-    entry.data_used = 4;
-    entry.data_total = 4;
-    entry.data = &tag_entry_data;
-
-    /* Describe a header buffer with no tags written, no data written, and space for two tag index records.
-     * i.e., next_index is the end of the rpmheader struct (32), data_start is (next_index + (2 * sizeof(struct rpmhdrindex))) == 96,
-     * and data_used is 0.
-     *
-     * We expect a seek to where the index will be written (32), one fwrite for each rpmhdrindex member, a seek to the start of the data,
-     * and a fwrite for the data.
-     */
-    next_index = 32;
-    data_start = 96;
-    data_used = 0;
-
-    expect_value(__wrap_fseeko, offset, next_index);
-    expect_value(__wrap_fseeko, whence, SEEK_SET);
-    will_return(__wrap_fseeko, 0);
-
+    /* tag */
     u32_buf = htobe32(RPMTAG_SIZE);
-    expect_memory(__wrap_fwrite, ptr, &u32_buf, 4);
-    expect_value(__wrap_fwrite, size, 4);
-    expect_value(__wrap_fwrite, nmemb, 1);
-    will_return(__wrap_fwrite, 1);
+    memcpy(expected_buffer, &u32_buf, 4);
 
+    /* type */
     u32_buf = htobe32(RPM_INT32_TYPE);
-    expect_memory(__wrap_fwrite, ptr, &u32_buf, 4);
-    expect_value(__wrap_fwrite, size, 4);
-    expect_value(__wrap_fwrite, nmemb, 1);
-    will_return(__wrap_fwrite, 1);
+    memcpy(expected_buffer + 4, &u32_buf, 4);
 
-    u32_buf = 0;
-    expect_memory(__wrap_fwrite, ptr, &u32_buf, 4);
-    expect_value(__wrap_fwrite, size, 4);
-    expect_value(__wrap_fwrite, nmemb, 1);
-    will_return(__wrap_fwrite, 1);
+    /* offset */
+    u32_buf = htobe32(offset);
+    memcpy(expected_buffer + 8, &u32_buf, 4);
 
-    u32_buf = htobe32(entry.count);
-    expect_memory(__wrap_fwrite, ptr, &u32_buf, 4);
-    expect_value(__wrap_fwrite, size, 4);
-    expect_value(__wrap_fwrite, nmemb, 1);
-    will_return(__wrap_fwrite, 1);
+    /* count */
+    u32_buf = htobe32(count);
+    memcpy(expected_buffer + 12, &u32_buf, 4);
 
-    expect_value(__wrap_fseeko, offset, data_start);
-    expect_value(__wrap_fseeko, whence, SEEK_SET);
-    will_return(__wrap_fseeko, 0);
-
-    expect_memory(__wrap_fwrite, ptr, entry.data, entry.data_used);
-    expect_value(__wrap_fwrite, size, 1);
-    expect_value(__wrap_fwrite, nmemb, entry.data_used);
-    will_return(__wrap_fwrite, entry.data_used);
-
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, int32_type, WRAP_OUTPUT), 0);
-    assert_int_equal(data_used, 4);
+    construct_tag_header(RPMTAG_SIZE, RPM_INT32_TYPE, offset, count, output_buffer);
+    assert_memory_equal(output_buffer, expected_buffer, sizeof(expected_buffer));
 }
 
-static void test_construct_tag_bin(void **state) {
-    /* Check that the count for RPM_BIN_TYPE is correctly adjusted. */
-    struct tag_entry entry;
-    unsigned char tag_entry_data[32] = { 0 };
+void test_construct_header(void **state) {
+    tag_db *tags;
+    char *output_buffer;
+    size_t output_size;
     uint32_t u32_buf;
 
-    off_t next_index;
-    off_t data_start;
-    off_t data_used;
+    uint32_t size_value = 47;
+    uint32_t filesize_1 = 48;
+    uint32_t filesize_2 = 48;
 
-    entry.count = 1;
-    entry.data_used = sizeof(tag_entry_data);
-    entry.data_total = sizeof(tag_entry_data);
-    entry.data = tag_entry_data;
+    /* 16-byte header, 2 16-byte index records, 12 bytes of data */
+    size_t expected_size = 60;
+    char expected_buffer[60] = { 0 };
 
-    next_index = 32;
-    data_start = 96;
-    data_used = 0;
+    tags = init_tag_db();
+    assert_non_null(tags);
 
-    expect_any_always(__wrap_fseeko, offset);
-    expect_any_always(__wrap_fseeko, whence);
-    will_return_always(__wrap_fseeko, 0);
+    /* Add a couple of tags */
+    u32_buf = htobe32(49);
+    assert_int_equal(add_tag(tags, RPMTAG_FILESIZES, &filesize_1, sizeof(filesize_1)), 0);
+    u32_buf = htobe32(48);
+    assert_int_equal(add_tag(tags, RPMTAG_FILESIZES, &filesize_2, sizeof(filesize_2)), 0);
 
-    u32_buf = htobe32(RPMTAG_SIZE);
-    expect_memory(__wrap_fwrite, ptr, &u32_buf, 4);
-    expect_value(__wrap_fwrite, size, 4);
-    expect_value(__wrap_fwrite, nmemb, 1);
-    will_return(__wrap_fwrite, 1);
+    assert_int_equal(add_tag(tags, RPMTAG_SIZE, &size_value, sizeof(size_value)), 0);
 
-    u32_buf = htobe32(RPM_BIN_TYPE);
-    expect_memory(__wrap_fwrite, ptr, &u32_buf, 4);
-    expect_value(__wrap_fwrite, size, 4);
-    expect_value(__wrap_fwrite, nmemb, 1);
-    will_return(__wrap_fwrite, 1);
+    /* construct what we expect to come back */
+    /* header magic */
+    u32_buf = htobe32(RPMHEADER_MAGIC);
+    memcpy(expected_buffer, &u32_buf, 4);
 
-    u32_buf = 0;
-    expect_memory(__wrap_fwrite, ptr, &u32_buf, 4);
-    expect_value(__wrap_fwrite, size, 4);
-    expect_value(__wrap_fwrite, nmemb, 1);
-    will_return(__wrap_fwrite, 1);
+    /* four bytes "reserved", leave as 0's */
+    /* nindex, four bytes, should be 2 for the 2 tags */
+    u32_buf = htobe32(2);
+    memcpy(expected_buffer + 8, &u32_buf, 4);
 
-    u32_buf = htobe32(sizeof(tag_entry_data));
-    expect_memory(__wrap_fwrite, ptr, &u32_buf, 4);
-    expect_value(__wrap_fwrite, size, 4);
-    expect_value(__wrap_fwrite, nmemb, 1);
-    will_return(__wrap_fwrite, 1);
+    /* hsize, four bytes, should be 12 */
+    u32_buf = htobe32(12);
+    memcpy(expected_buffer + 12, &u32_buf, 4);
 
-    expect_memory(__wrap_fwrite, ptr, entry.data, entry.data_used);
-    expect_value(__wrap_fwrite, size, 1);
-    expect_value(__wrap_fwrite, nmemb, entry.data_used);
-    will_return(__wrap_fwrite, entry.data_used);
+    /* index records. The tags_used list is built by prepending to head, so it's
+     * in reverse order with respect to the add_tag calls.
+     */
+    construct_tag_header(RPMTAG_SIZE, RPM_INT32_TYPE, 0, 1, expected_buffer + 16);
+    construct_tag_header(RPMTAG_FILESIZES, RPM_INT32_TYPE, 4, 2, expected_buffer + 32);
 
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, bin_type, WRAP_OUTPUT), 0);
+    /* data blob */
+    /* RPMTAG_SIZE value */
+    memcpy(expected_buffer + 48, &size_value, 4);
+
+    /* RPMTAG_FILESIZE array */
+    memcpy(expected_buffer + 52, &filesize_1, 4);
+    memcpy(expected_buffer + 56, &filesize_2, 4);
+
+    assert_int_equal(construct_header(tags, &output_buffer, &output_size, rpm_tag_get_type), 0);
+
+    assert_int_equal(output_size, expected_size);
+    assert_non_null(output_buffer);
+    assert_memory_equal(output_buffer, expected_buffer, expected_size);
+
+    free(output_buffer);
+    free_tag_db(tags);
 }
 
-static void test_construct_tag_write_errors(void **state) {
-    struct tag_entry entry;
-    uint32_t tag_entry_data;
+void test_construct_header_bin(void **state) {
+    /* Ensure the count is correctly adjusted for RPM_BIN_TYPE */
 
-    off_t next_index;
-    off_t data_start;
-    off_t data_used;
+    tag_db *tags;
+    char *output_buffer;
+    size_t output_size;
+    uint32_t u32_buf;
 
-    tag_entry_data = 0;
-    entry.count = 1;
-    entry.data_used = 4;
-    entry.data_total = 4;
-    entry.data = &tag_entry_data;
+    char md5sum[32] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x16,
+                        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F
+    };
 
-    next_index = 32;
-    data_start = 96;
-    data_used = 0;
+    size_t expected_size = 64;
+    char expected_buffer[64] = { 0 };
 
-    /* Ignore all input, just set an error in the output at each point */
-    expect_any_always(__wrap_fseeko, offset);
-    expect_any_always(__wrap_fseeko, whence);
+    tags = init_tag_db();
+    assert_non_null(tags);
 
-    expect_any_always(__wrap_fwrite, ptr);
-    expect_any_always(__wrap_fwrite, size);
-    expect_any_always(__wrap_fwrite, nmemb);
+    assert_int_equal(add_tag(tags, RPMSIGTAG_MD5, md5sum, sizeof(md5sum)), 0);
 
-    will_return(__wrap_fseeko, -1);
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, int32_type, WRAP_OUTPUT), -1);
+    /* header magic */
+    u32_buf = htobe32(RPMHEADER_MAGIC);
+    memcpy(expected_buffer, &u32_buf, 4);
 
-    will_return(__wrap_fseeko, 0);
-    will_return(__wrap_fwrite, 0);
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, int32_type, WRAP_OUTPUT), -1);
+    /* four bytes "reserved", leave as 0's */
+    /* nindex, four bytes */
+    u32_buf = htobe32(1);
+    memcpy(expected_buffer + 8, &u32_buf, 4);
 
-    will_return(__wrap_fseeko, 0);
-    will_return(__wrap_fwrite, 1);
-    will_return(__wrap_fwrite, 0);
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, int32_type, WRAP_OUTPUT), -1);
+    /* hsize, four bytes */
+    u32_buf = htobe32(sizeof(md5sum));
+    memcpy(expected_buffer + 12, &u32_buf, 4);
 
-    will_return(__wrap_fseeko, 0);
-    will_return_count(__wrap_fwrite, 1, 2);
-    will_return(__wrap_fwrite, 0);
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, int32_type, WRAP_OUTPUT), -1);
+    /* index record */
+    construct_tag_header(RPMSIGTAG_MD5, RPM_BIN_TYPE, 0, 32, expected_buffer + 16);
 
-    will_return(__wrap_fseeko, 0);
-    will_return_count(__wrap_fwrite, 1, 3);
-    will_return(__wrap_fwrite, 0);
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, int32_type, WRAP_OUTPUT), -1);
+    /* data */
+    memcpy(expected_buffer + 32, md5sum, sizeof(md5sum));
 
-    will_return(__wrap_fseeko, 0);
-    will_return_count(__wrap_fwrite, 1, 4);
-    will_return(__wrap_fseeko, -1);
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, int32_type, WRAP_OUTPUT), -1);
+    assert_int_equal(construct_header(tags, &output_buffer, &output_size, rpm_sig_tag_get_type), 0);
 
-    will_return_count(__wrap_fseeko, 0, 2);
-    will_return_count(__wrap_fwrite, 1, 4);
-    will_return(__wrap_fwrite, 0);
-    assert_int_equal(construct_tag(RPMTAG_SIZE, &entry, next_index, data_start, &data_used, int32_type, WRAP_OUTPUT), -1);
+    assert_int_equal(output_size, expected_size);
+    assert_non_null(output_buffer);
+    assert_memory_equal(output_buffer, expected_buffer, expected_size);
+
+    free(output_buffer);
+    free_tag_db(tags);
 }
 
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_output_lead),
         cmocka_unit_test(test_align_tag),
-        cmocka_unit_test(test_construct_tag),
-        cmocka_unit_test(test_construct_tag_bin),
-        cmocka_unit_test(test_construct_tag_write_errors),
+        cmocka_unit_test(test_construct_tag_header),
+        cmocka_unit_test(test_construct_header_bin),
+        cmocka_unit_test(test_construct_header),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

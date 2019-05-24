@@ -16,4 +16,4 @@ test_metadata_SOURCES = test-metadata.c
 test_metadata_LDFLAGS = -Wl,--wrap=getpwuid -Wl,--wrap=getgrgid -Wl,--wrap=add_tag
 
 test_output_SOURCES = test-output.c
-test_output_LDFLAGS = -Wl,--wrap=fwrite -Wl,--wrap=fseeko
+test_output_LDFLAGS = -Wl,--wrap=fwrite
