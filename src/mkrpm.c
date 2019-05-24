@@ -173,6 +173,7 @@ int main(int argc, char **argv) {
 
     /* Add the files specified on the command-line. */
     for (i = 1; i < argc; i++) {
+        /* TODO normalize filenames */
         if (add_file(tags, archive, resolver, argv[i]) != 0) {
             exit(EXIT_FAILURE);
         }
