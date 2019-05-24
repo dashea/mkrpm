@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
             (add_tag(tags, RPMTAG_ARCH, arch, strlen(arch) + 1) != 0) ||
             (add_tag(tags, RPMTAG_PAYLOADFORMAT, payload_format, strlen(payload_format) + 1) != 0) ||
             (add_tag(tags, RPMTAG_PAYLOADCOMPRESSOR, compression, strlen(compression) + 1) != 0) ||
-            (add_tag(tags, RPMTAG_PAYLOADFORMAT, payload_flags, strlen(payload_flags) + 1) != 0) ||
+            (add_tag(tags, RPMTAG_PAYLOADFLAGS, payload_flags, strlen(payload_flags) + 1) != 0) ||
             (add_tag(tags, RPMTAG_HEADERI18NTABLE, "C", 2) != 0)) {
         exit(EXIT_FAILURE);
     }
