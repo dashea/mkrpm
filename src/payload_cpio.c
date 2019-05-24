@@ -199,7 +199,7 @@ static int add_payload_entry(struct archive *archive, struct archive_entry *entr
  * Return -1 on failure.
  */
 int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolver *resolver, tag_db *tags, const char *pathname, struct stat *sbuf) {
-    char link_target[PATH_MAX];
+    char link_target[PATH_MAX + 1];
     struct archive_entry *entry = NULL;
     struct archive_entry *sparse = NULL;
 
@@ -234,6 +234,8 @@ int add_file_to_payload(struct archive *archive, struct archive_entry_linkresolv
 
     /* If this is a symlink, set the symlink destination */
     if (S_ISLNK(sbuf->st_mode)) {
+        memset(link_target, 0, sizeof(link_target));
+
         if (readlink(pathname, link_target, PATH_MAX) < 0) {
             fprintf(stderr, "Unable to readlink at %s: %s\n", pathname, strerror(errno));
             goto cleanup;
