@@ -145,7 +145,6 @@ int construct_header(tag_db *tags, char **output_buffer, size_t *output_size, ta
 
     assert(tags != NULL);
     assert(output_buffer != NULL);
-    assert(*output_buffer != NULL);
     assert(output_size != NULL);
     assert(f_tag_type != NULL);
 
