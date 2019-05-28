@@ -40,7 +40,7 @@ AC_TYPE_SSIZE_T
 AC_FUNC_REALLOC
 
 # Checks for pkg-config modules
-PKG_CHECK_MODULES([CMOCKA], [cmocka])
+PKG_CHECK_MODULES([CMOCKA], [cmocka >= 1.1.4])
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive])
 PKG_CHECK_MODULES([LIBCRYPTO], [libcrypto])
 
