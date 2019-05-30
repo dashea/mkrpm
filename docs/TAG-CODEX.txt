@@ -497,6 +497,27 @@ These are tags that are used by RPM but that are not described in LSB-5.0.0.
 
     Like RPMSIGTAG_SHA1, this data is stored as a string instead of as binary data.
 
+* RPMSIGTAG_FILESIGNATURES = 274 (STRING ARRAY)
+
+    These are an RSA signature of the SHA-256 checksum of each file, for use with IMA.
+    All of the data is stored as the hex value of the signature, as an array of strings.
+
+    The value is a header consisting of:
+       * \x03, added by RPM
+       * \x02, The version of the ima-evm-utils header
+       * A one-byte value indicating the hash digest used (\x04 for SHA256)
+       * The keyid, which is the last four bytes of the SHA1 digest of the
+         the DER-representation of the RSA public key used for the signatures
+       * The size of the signature payload, 2 bytes
+
+    Followed by the signature.
+
+* RPMSIGTAG_FILESIGNATURELENGTH = 275 (INT32)
+
+    The length of the signatures stored in RPMSIGTAG_FILESIGNATURES (the binary version,
+    not the hex values that actually get stored).
+
+
 * RPMTAG_VERIFYSCRIPTPROG = 1091 (STRING)
 
     The interpreter for the %verify scriptlet. The type may be RPM_STRING_ARRAY_TYPE,
@@ -530,21 +551,6 @@ anyone is curious about what these things crudding up the enums are.
     I think. Who knows!
 
     This was RPMSIGTAG_SHA1HEADER, and RPMSIGTAG_SHA1HEADER moved to 269.
-
-* RPMSIGTAG_FILESIGNATURES = 274 (STRING ARRAY)
-
-    These are an RSA signature of the SHA-256 checksum of each file, for use with IMA.
-    All of the data is stored as the hex value of the signature, as an array of strings.
-    The format is whatever is output by ima-evm-util's sign_hash function.
-
-    It's also completely broken. The signFile function, in order to determine whether a
-    given file digest is actually valid, creates an array of zeroes to memcmp against...and
-    then it passes the zeroes to ima-evm instead of the actual file hash.
-
-* RPMSIGTAG_FILESIGNATURELENGTH = 275 (INT32)
-
-    The length of the signatures stored in RPMSIGTAG_FILESIGNATURES (the binary version,
-    not the hex values that actually get stored).
 
 * RPMSIGTAG_LEMD5_1 = 1001 (BIN)
 
